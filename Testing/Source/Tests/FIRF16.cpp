@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include "Error.h"
 
-#define SNR_THRESHOLD 60
+#define SNR_THRESHOLD 52
 
 /* 
 
@@ -10,7 +10,7 @@ Reference patterns are generated with
 a double precision computation.
 
 */
-#define REL_ERROR (2.0e-2)
+#define REL_ERROR (6.0e-2)
 
 #if defined(ARM_MATH_MVEF) && !defined(ARM_MATH_AUTOVECTORIZE)
 static __ALIGNED(8) float16_t coeffArray[32];

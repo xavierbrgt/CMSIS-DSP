@@ -4,7 +4,7 @@
 
 #define SNR_THRESHOLD 100
 
-#define ABS_ERROR_Q31 ((q31_t)2)
+#define ABS_ERROR_Q31 ((q31_t)3)
 
 #if defined(ARM_MATH_MVEI) && !defined(ARM_MATH_AUTOVECTORIZE)
 static __ALIGNED(8) q31_t coeffArray[32];

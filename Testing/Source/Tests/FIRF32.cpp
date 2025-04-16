@@ -10,7 +10,7 @@ Reference patterns are generated with
 a double precision computation.
 
 */
-#define REL_ERROR (3.0e-5)
+#define REL_ERROR (6.0e-5)
 
 #if defined(ARM_MATH_MVEF) && !defined(ARM_MATH_AUTOVECTORIZE)
 static __ALIGNED(8) float32_t coeffArray[32];

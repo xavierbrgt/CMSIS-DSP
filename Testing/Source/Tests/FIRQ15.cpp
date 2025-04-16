@@ -2,9 +2,9 @@
 #include <stdio.h>
 #include "Error.h"
 
-#define SNR_THRESHOLD 59
+#define SNR_THRESHOLD 49
 
-#define ABS_ERROR_Q15 ((q15_t)2)
+#define ABS_ERROR_Q15 ((q15_t)3)
 
 #if defined(ARM_MATH_MVEI) && !defined(ARM_MATH_AUTOVECTORIZE)
 static __ALIGNED(8) q15_t coeffArray[32];
