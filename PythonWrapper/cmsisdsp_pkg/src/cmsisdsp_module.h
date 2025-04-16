@@ -34,7 +34,10 @@
 // Check it is built with right version
 // (should be backward compatible down to 1.23.5)
 // https://github.com/numpy/numpy/blob/main/numpy/_core/include/numpy/numpyconfig.h
-#if (NPY_API_VERSION != NPY_2_0_API_VERSION  )
+#if (NPY_API_VERSION != NPY_2_1_API_VERSION   )
+#define STR_HELPER(x) #x
+#define STR(x) STR_HELPER(x)
+#pragma message "Building with numpy version " STR(NPY_API_VERSION)
 #error("Error building with wrong NumPy API version")
 #endif
 
@@ -147,6 +150,12 @@ Method_##NAME##_##FIELD(dsp_##NAME##Object *self, PyObject *ignored)\
        }                                                                      \
     }
 
+// Get array argument using a copy that is also doing data conversion
+// In numpy, we don't want to force the use of float when the default is double
+// to make the use of the API easier.
+// So double arrays will be converted to float32 array by this macro
+// and the wrapper code is using NPY_DOUBLE for float32 CMSIS-DSP functions
+// when using this macro
 #define GETARGUMENT(FIELD,FORMAT,SRCFORMAT,DSTFORMAT)                          \
     uint32_t arraySize##FIELD=0;                                               \
     if (FIELD)                                                                 \
@@ -165,6 +174,57 @@ Method_##NAME##_##FIELD(dsp_##NAME##Object *self, PyObject *ignored)\
            Py_DECREF(FIELD##c);                                                \
        }                                                                       \
     }
+
+#define ACCESSARRAY(DST,FIELD,FORMAT,SRCFORMAT)                               \
+   {                                                                          \
+       PyArray_Descr *desct=PyArray_DescrFromType(FORMAT);                    \
+       FIELD##c = PyArray_FromAny(FIELD,desct,                                \
+        1,0,NPY_ARRAY_C_CONTIGUOUS | NPY_ARRAY_ALIGNED | NPY_ARRAY_FORCECAST, \
+        NULL);                                                                \
+       if (FIELD##c != NULL)                                                  \
+       {                                                                      \
+           DST=(SRCFORMAT*)PyArray_DATA((PyArrayObject*)FIELD##c);            \
+       }                                                                      \
+    }
+       
+#define ARRAYNOMOREUSED(FIELD)  \
+       if (FIELD##c)            \
+       {                        \
+        Py_DECREF((PyObject*)FIELD##c); \
+       }
+
+/*
+
+For management of temporary buffers in Neon version.
+If the temporary buffer is passed as named argument, it is used. 
+Otherwise, a temporary buffer is allocated in the function to 
+minimize the change required when upgrading a Python script to the 
+Neon version of the extension.
+
+*/
+
+#define ALLOC_OR_GET_TMP(TMP,PYTMP,NBSAMPLES,NUMPY_DT,CMSIS_DT) \
+       CMSIS_DT *TMP=NULL;                                              \
+       PyObject *PYTMP##c=NULL;                                 \
+                                                                \
+       if (PYTMP)                                               \
+       {                                                        \
+         ACCESSARRAY(TMP,PYTMP,NUMPY_DT,CMSIS_DT);              \
+       }                                                        \
+       else                                                     \
+       {                                                        \
+         TMP = PyMem_Malloc(NBSAMPLES*sizeof(CMSIS_DT));        \
+       }
+   
+#define FREE_OR_RELEASE(TMP,PYTMP) \
+       if (PYTMP)                  \
+       {                           \
+           ARRAYNOMOREUSED(PYTMP); \
+       }                           \
+       else                        \
+       {                           \
+          PyMem_Free(TMP);         \
+       }
 
 #define FREEARGUMENT(FIELD) \
     PyMem_Free(FIELD)

@@ -25,10 +25,31 @@ __version__ = re.search(
 
 includes = [os.path.join(ROOT,"Include"),os.path.join(ROOT,"PrivateInclude"),os.path.join("PythonWrapper","cmsisdsp_pkg","src")]
 
+linkargs=[]
+
 if sys.platform == 'win32':
-  cflags = ["-DWIN","-DCMSISDSP","-DUNALIGNED_SUPPORT_DISABLE"] 
+  cflags = ["-DWIN",
+            "-DCMSISDSP",
+            "-DUNALIGNED_SUPPORT_DISABLE"] 
+elif sys.platform == 'darwin':
+  os.environ["ARCHFLAGS"] = "-arch arm64"
+  linkargs = ["-arch", "arm64"]
+  cflags = ["-DARM_MATH_NEON",
+            "-Wno-attributes",
+            "-Wno-unused-function",
+            "-Wno-unused-variable",
+            "-Wno-implicit-function-declaration",
+            "-DCMSISDSP",
+            "-arch", "arm64",
+            "-D__GNUC_PYTHON__"]
 else:
-  cflags = ["-Wno-attributes","-Wno-unused-function","-Wno-unused-variable","-Wno-implicit-function-declaration","-DCMSISDSP","-D__GNUC_PYTHON__"]
+  cflags = ["-DARM_MATH_NEON",
+            "-Wno-attributes",
+            "-Wno-unused-function",
+            "-Wno-unused-variable",
+            "-Wno-implicit-function-declaration",
+            "-DCMSISDSP",
+            "-D__GNUC_PYTHON__"]
 
 # Add dependencies
 transformMod = [] # transform + common + basic + complexf + fastmath + matrix + statistics
@@ -129,14 +150,13 @@ def mkModule(name,srcs,funcDir):
                               ,
                     include_dirs =  [localinc] + includes + [numpy.get_include()],
                     extra_compile_args = cflags,
+                    extra_link_args = linkargs,
                     library_dirs = libdir,
                     libraries=lib,
                     extra_objects=extraobjs
                               ))
 
-flagsForCommonWithoutFFT=["-DARM_DSP_CONFIG_TABLES", 
-    "-DARM_FAST_ALLOW_TABLES", 
-    "-DARM_ALL_FAST_TABLES"]
+flagsForCommonWithoutFFT=[]
 
 moduleFiltering = mkModule('cmsisdsp_filtering',filtering,"FilteringFunctions")
 moduleMatrix = mkModule('cmsisdsp_matrix',matrix,"MatrixFunctions")
@@ -185,7 +205,7 @@ def build():
                         moduleWindow
                         ],
          include_package_data=True,
-         author = 'Copyright (C) 2010-2024 ARM Limited or its affiliates. All rights reserved.',
+         author = 'Copyright (C) 2010-2025 ARM Limited or its affiliates. All rights reserved.',
          author_email = 'christophe.favergeon@arm.com',
          url="https://github.com/ARM-software/CMSIS-DSP",
          python_requires='>=3.9',
@@ -197,7 +217,7 @@ def build():
                 "Programming Language :: C",
                 "License :: OSI Approved :: Apache Software License",
                 "Operating System :: OS Independent",
-                "Development Status :: 4 - Beta",
+                "Development Status :: 5 - Production/Stable",
                 "Topic :: Software Development :: Embedded Systems",
                 "Topic :: Scientific/Engineering :: Mathematics",
                 "Environment :: Console",

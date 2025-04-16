@@ -54,7 +54,7 @@ Since the [CMSIS-DSP](https://github.com/ARM-software/CMSIS-DSP) wrapper is usin
 
     > pip install numpy
 
-Once `NumPy` is installed, you can build the [CMSIS-DSP](https://github.com/ARM-software/CMSIS-DSP) python wrapper. Go to folder `CMSIS/DSP`.
+Once `NumPy` is installed, you can build the [CMSIS-DSP](https://github.com/ARM-software/CMSIS-DSP) python wrapper. Go to folder `CMSIS-DSP`.
 
 Now, you can install the cmsisdsp package in editable mode:
 
@@ -65,6 +65,22 @@ Before using this command, you need to rebuild the CMSIS-DSP library which is no
 There is a `CMakeLists.txt` in the `PythonWrapper` folder for this. The `build` folders in `PythonWrapper` are giving some examples of the options to use with the `cmake` command to generate the `Makefile` and build the library.
 
 This library is then used by the `setup.py` script to build the Python extension.
+
+During development,you can rebuild only the object for the
+extension using : 
+    > python setup.py build_ext --inplace
+
+It is faster than just using `pip install`
+
+To build a wheel you can do:
+    >  pip wheel . -w dist
+
+For Darwin with Neon, to force an arm64 build and not an
+universal build, use:
+    > python setup.py bdist_wheel --plat-name macosx_11_0_arm64 -d dist
+
+The wheel package may have to be installed.
+
 
 ## Running the examples
 
@@ -184,7 +200,7 @@ You convert back to a complex format to compare with scipy:
 
 ## Matrix 
 
-For matrix, the instance variables are masked by the Python API. We decided that for matrix only there was no use for having the [CMSIS-DSP](https://github.com/ARM-software/CMSIS-DSP) instance visibles since they contain the same information as the numpy array (samples and dimension).
+For matrix, the instance variables are masked by the Python API. We decided that for matrix only there was no use for having the [CMSIS-DSP](https://github.com/ARM-software/CMSIS-DSP) instance visible since they contain the same information as the numpy array (samples and dimension).
 
 So to use a [CMSIS-DSP](https://github.com/ARM-software/CMSIS-DSP) matrix function, it is very simple:
 
@@ -233,6 +249,13 @@ MEL filters are represented as 3 arrays to encode a sparse array.
 
 
 # Change history
+
+## Version 1.10.2:
+* Release build of CMSIS-DSP for the Neon versions
+
+## Version 1.10.1:
+* Some Neon acceleration on Arm aarch64 (with small API differences for FFT)
+* Version 1.10 was removed because of issues in some buffer management
 
 ## Version 1.9.9:
 * Supports Python 3.12
