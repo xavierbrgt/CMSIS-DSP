@@ -40,8 +40,8 @@ def writeTests(config,format):
     # state numTaps + blockSize - 1
     # ref blockSize
 
-    # Maximum number of samples for all tested FIR configurations is 2*23
-    t = np.linspace(0, 1, 2*23)
+    # Maximum number of samples for all tested FIR configurations is 2*36
+    t = np.linspace(0, 1, 2*36)
 
     x = np.sin(2*np.pi*50*t)+np.random.randn(len(t)) * 0.08
     x = Tools.normalize(x)
@@ -55,11 +55,11 @@ def writeTests(config,format):
     defs=[] 
 
     if format == Tools.F64 or format == 0 or format == 31:
-       blk = [1, 2, 3, 8, 9,10,11, 16, 23]
-       taps = [1, 2, 3, 4, 5, 6, 7, 8, 11, 16, 23, 25]
+       blk = range(1,36)
+       taps = range(1,36)
     elif format == 15 or format == 16:
-       blk = [1, 2, 3, 12,13,14,15]
-       taps = [2, 3, 4, 5, 6, 7, 8, 11, 25]
+       blk = range(1,36)
+       taps = range(1,36)
     elif format == 7:
        blk = [1, 2, 3 ,20,21,22,23]
        taps = [1, 2, 3, 4, 5, 6, 7, 8, 11, 25]
