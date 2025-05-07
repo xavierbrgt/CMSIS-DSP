@@ -46,10 +46,11 @@
 
   @par           Scaling and Overflow Behavior
                    The function is implemented using an internal 64-bit accumulator.
-                   The accumulator has a 2.62 format and maintains full precision of the intermediate multiplication results but provides only a single guard bit.
-                   Thus, if the accumulator result overflows it wraps around rather than clip.
-                   In order to avoid overflows completely the input signal must be scaled down by log2(numTaps) bits.
-                   After all multiply-accumulates are performed, the 2.62 accumulator is right shifted by 31 bits and saturated to 1.31 format to yield the final result.
+                   The accumulator has a 2.62 format and maintains full precision of the intermediate multiplication
+ results but provides only a single guard bit. Thus, if the accumulator result overflows it wraps around rather than
+ clip. In order to avoid overflows completely the input signal must be scaled down by log2(numTaps) bits. After all
+ multiply-accumulates are performed, the 2.62 accumulator is right shifted by 31 bits and saturated to 1.31 format to
+ yield the final result.
 
  @remark
                    Refer to \ref arm_fir_fast_q31() for a faster but less precise implementation of this filter.
@@ -58,159 +59,155 @@
 
 #include "arm_helium_utils.h"
 
-#define FIR_Q31_CORE(nbAcc, nbVecTaps, pSample, vecCoeffs)       \
-    for (int j = 0; j < nbAcc; j++)                              \
-    {                                                            \
-        const q31_t *pSmp = &pSamples[j];                        \
-        q31x4_t vecIn0;                                          \
-        q63_t acc[4];                                            \
-                                                                 \
-        acc[j] = 0;                                              \
-        for (int i = 0; i < nbVecTaps; i++)                      \
-        {                                                        \
-            vecIn0 = vld1q(pSmp + 4 * i);                        \
-            acc[j] = vrmlaldavhaq(acc[j], vecIn0, vecCoeffs[i]); \
-        }                                                        \
-        *pOutput++ = (q31_t)asrl(acc[j], 23);                    \
+#define FIR_Q31_CORE(nbAcc, nbVecTaps, pSample, vecCoeffs)                                                             \
+    for (int j = 0; j < nbAcc; j++)                                                                                    \
+    {                                                                                                                  \
+        const q31_t *pSmp = &pSamples[j];                                                                              \
+        q31x4_t vecIn0;                                                                                                \
+        q63_t acc[4];                                                                                                  \
+                                                                                                                       \
+        acc[j] = 0;                                                                                                    \
+        for (int i = 0; i < nbVecTaps; i++)                                                                            \
+        {                                                                                                              \
+            vecIn0 = vld1q(pSmp + 4 * i);                                                                              \
+            acc[j] = vrmlaldavhaq(acc[j], vecIn0, vecCoeffs[i]);                                                       \
+        }                                                                                                              \
+        *pOutput++ = (q31_t)asrl(acc[j], 23);                                                                          \
     }
 
-#define FIR_Q31_CORE_STR_PARTIAL(nbAcc, nbVecTaps, pSample, vecCoeffs) \
-    for (int j = 0; j < nbAcc; j++)                                    \
-    {                                                                  \
-        const q31_t *pSmp = &pSamples[j];                              \
-        q31x4_t vecIn0;                                                \
-                                                                       \
-        acc[j] = 0;                                                    \
-        for (int i = 0; i < nbVecTaps; i++)                            \
-        {                                                              \
-            vecIn0 = vld1q(pSmp + 4 * i);                              \
-            acc[j] = vrmlaldavhaq(acc[j], vecIn0, vecCoeffs[i]);       \
-        }                                                              \
-        *arm_fir_partial_accu_ptr++ = acc[j];                          \
+#define FIR_Q31_CORE_STR_PARTIAL(nbAcc, nbVecTaps, pSample, vecCoeffs)                                                 \
+    for (int j = 0; j < nbAcc; j++)                                                                                    \
+    {                                                                                                                  \
+        const q31_t *pSmp = &pSamples[j];                                                                              \
+        q31x4_t vecIn0;                                                                                                \
+                                                                                                                       \
+        acc[j] = 0;                                                                                                    \
+        for (int i = 0; i < nbVecTaps; i++)                                                                            \
+        {                                                                                                              \
+            vecIn0 = vld1q(pSmp + 4 * i);                                                                              \
+            acc[j] = vrmlaldavhaq(acc[j], vecIn0, vecCoeffs[i]);                                                       \
+        }                                                                                                              \
+        *arm_fir_partial_accu_ptr++ = acc[j];                                                                          \
     }
 
-#define FIR_Q31_CORE_LD_PARTIAL(nbAcc, nbVecTaps, pSample, vecCoeffs) \
-    for (int j = 0; j < nbAcc; j++)                                   \
-    {                                                                 \
-        const q31_t *pSmp = &pSamples[j];                             \
-        q31x4_t vecIn0;                                               \
-                                                                      \
-        acc[j] = *arm_fir_partial_accu_ptr++;                         \
-                                                                      \
-        for (int i = 0; i < nbVecTaps; i++)                           \
-        {                                                             \
-            vecIn0 = vld1q(pSmp + 4 * i);                             \
-            acc[j] = vrmlaldavhaq(acc[j], vecIn0, vecCoeffs[i]);      \
-        }                                                             \
-        *pOutput++ = (q31_t)asrl(acc[j], 23);                         \
+#define FIR_Q31_CORE_LD_PARTIAL(nbAcc, nbVecTaps, pSample, vecCoeffs)                                                  \
+    for (int j = 0; j < nbAcc; j++)                                                                                    \
+    {                                                                                                                  \
+        const q31_t *pSmp = &pSamples[j];                                                                              \
+        q31x4_t vecIn0;                                                                                                \
+                                                                                                                       \
+        acc[j] = *arm_fir_partial_accu_ptr++;                                                                          \
+                                                                                                                       \
+        for (int i = 0; i < nbVecTaps; i++)                                                                            \
+        {                                                                                                              \
+            vecIn0 = vld1q(pSmp + 4 * i);                                                                              \
+            acc[j] = vrmlaldavhaq(acc[j], vecIn0, vecCoeffs[i]);                                                       \
+        }                                                                                                              \
+        *pOutput++ = (q31_t)asrl(acc[j], 23);                                                                          \
     }
 
-#define FIR_Q31_MAIN_CORE()                                                                  \
-    {                                                                                        \
-        q31_t *pRefStatePtr = S->pState + 2 * ARM_ROUND_UP(blockSize, 4);                    \
-        q31_t *pState = pRefStatePtr;      /* State pointer */                               \
-        const q31_t *pCoeffs = S->pCoeffs; /* Coefficient pointer */                         \
-        q31_t *pStateCur;                  /* Points to the current sample of the state */   \
-        const q31_t *pSamples;             /* Temporary pointer to the sample buffer */      \
-        q31_t *pOutput;                    /* Temporary pointer to the output buffer */      \
-        const q31_t *pTempSrc;             /* Temporary pointer to the source data */        \
-        q31_t *pTempDest;                  /* Temporary pointer to the destination buffer */ \
-        uint32_t numTaps = S->numTaps;     /* Number of filter coefficients in the filter */ \
-        int32_t blkCnt;                                                                      \
-                                                                                             \
-        /*                                                                                   \
-         * load coefs                                                                        \
-         */                                                                                  \
-        q31x4_t vecCoeffs[NBVECTAPS];                                                        \
-                                                                                             \
-        for (int i = 0; i < NBVECTAPS; i++)                                                  \
-            vecCoeffs[i] = vld1q(pCoeffs + 4 * i);                                           \
-                                                                                             \
-        /*                                                                                   \
-         * pState points to state array which contains previous frame (numTaps - 1) samples  \
-         * pStateCur points to the location where the new input data should be written       \
-         */                                                                                  \
-        pStateCur = &(pState[(numTaps - 1u)]);                                               \
-        pTempSrc = pSrc;                                                                     \
-        pSamples = pState;                                                                   \
-        pOutput = pDst;                                                                      \
-                                                                                             \
-        blkCnt = blockSize >> 2;                                                             \
-        while (blkCnt > 0)                                                                   \
-        {                                                                                    \
-            /*                                                                               \
-             * Save 4 input samples in the history buffer                                    \
-             */                                                                              \
-            vstrwq_s32(pStateCur, vldrwq_s32(pTempSrc));                                     \
-            pStateCur += 4;                                                                  \
-            pTempSrc += 4;                                                                   \
-                                                                                             \
-            FIR_Q31_CORE(4, NBVECTAPS, pSamples, vecCoeffs);                                 \
-                                                                                             \
-            pSamples += 4;                                                                   \
-            /*                                                                               \
-             * Decrement the sample block loop counter                                       \
-             */                                                                              \
-            blkCnt--;                                                                        \
-        }                                                                                    \
-                                                                                             \
-        /* tail */                                                                           \
-        int32_t residual = blockSize & 3;                                                    \
-        switch (residual)                                                                    \
-        {                                                                                    \
-        case 3:                                                                              \
-        {                                                                                    \
-            for (int i = 0; i < residual; i++)                                               \
-                *pStateCur++ = *pTempSrc++;                                                  \
-                                                                                             \
-            FIR_Q31_CORE(3, NBVECTAPS, pSamples, vecCoeffs);                                 \
-        }                                                                                    \
-        break;                                                                               \
-                                                                                             \
-        case 2:                                                                              \
-        {                                                                                    \
-            for (int i = 0; i < residual; i++)                                               \
-                *pStateCur++ = *pTempSrc++;                                                  \
-                                                                                             \
-            FIR_Q31_CORE(2, NBVECTAPS, pSamples, vecCoeffs);                                 \
-        }                                                                                    \
-        break;                                                                               \
-                                                                                             \
-        case 1:                                                                              \
-        {                                                                                    \
-            for (int i = 0; i < residual; i++)                                               \
-                *pStateCur++ = *pTempSrc++;                                                  \
-                                                                                             \
-            FIR_Q31_CORE(1, NBVECTAPS, pSamples, vecCoeffs);                                 \
-        }                                                                                    \
-        break;                                                                               \
-        }                                                                                    \
-                                                                                             \
-        /*                                                                                   \
-         * Copy the samples back into the history buffer start                               \
-         */                                                                                  \
-        pTempSrc = &pState[blockSize];                                                       \
-        pTempDest = pState;                                                                  \
-                                                                                             \
-        blkCnt = (numTaps - 1) >> 2;                                                         \
-        while (blkCnt > 0)                                                                   \
-        {                                                                                    \
-            vstrwq_s32(pTempDest, vldrwq_s32(pTempSrc));                                     \
-            pTempSrc += 4;                                                                   \
-            pTempDest += 4;                                                                  \
-            blkCnt--;                                                                        \
-        }                                                                                    \
-        blkCnt = (numTaps - 1) & 3;                                                          \
-        if (blkCnt > 0)                                                                      \
-        {                                                                                    \
-            mve_pred16_t p0 = vctp32q(blkCnt);                                               \
-            vstrwq_p_s32(pTempDest, vldrwq_z_s32(pTempSrc, p0), p0);                         \
-        }                                                                                    \
+#define FIR_Q31_MAIN_CORE()                                                                                            \
+    {                                                                                                                  \
+        q31_t *pRefStatePtr = S->pState + 2 * ARM_ROUND_UP(blockSize, 4);                                              \
+        q31_t *pState = pRefStatePtr;      /* State pointer */                                                         \
+        const q31_t *pCoeffs = S->pCoeffs; /* Coefficient pointer */                                                   \
+        q31_t *pStateCur;                  /* Points to the current sample of the state */                             \
+        const q31_t *pSamples;             /* Temporary pointer to the sample buffer */                                \
+        q31_t *pOutput;                    /* Temporary pointer to the output buffer */                                \
+        const q31_t *pTempSrc;             /* Temporary pointer to the source data */                                  \
+        q31_t *pTempDest;                  /* Temporary pointer to the destination buffer */                           \
+        uint32_t numTaps = S->numTaps;     /* Number of filter coefficients in the filter */                           \
+        int32_t blkCnt;                                                                                                \
+                                                                                                                       \
+        /*                                                                                                             \
+         * load coefs                                                                                                  \
+         */                                                                                                            \
+        q31x4_t vecCoeffs[NBVECTAPS];                                                                                  \
+                                                                                                                       \
+        for (int i = 0; i < NBVECTAPS; i++)                                                                            \
+            vecCoeffs[i] = vld1q(pCoeffs + 4 * i);                                                                     \
+                                                                                                                       \
+        /*                                                                                                             \
+         * pState points to state array which contains previous frame (numTaps - 1) samples                            \
+         * pStateCur points to the location where the new input data should be written                                 \
+         */                                                                                                            \
+        pStateCur = &(pState[(numTaps - 1u)]);                                                                         \
+        pTempSrc = pSrc;                                                                                               \
+        pSamples = pState;                                                                                             \
+        pOutput = pDst;                                                                                                \
+                                                                                                                       \
+        blkCnt = blockSize >> 2;                                                                                       \
+        while (blkCnt > 0)                                                                                             \
+        {                                                                                                              \
+            /*                                                                                                         \
+             * Save 4 input samples in the history buffer                                                              \
+             */                                                                                                        \
+            vstrwq_s32(pStateCur, vldrwq_s32(pTempSrc));                                                               \
+            pStateCur += 4;                                                                                            \
+            pTempSrc += 4;                                                                                             \
+                                                                                                                       \
+            FIR_Q31_CORE(4, NBVECTAPS, pSamples, vecCoeffs);                                                           \
+                                                                                                                       \
+            pSamples += 4;                                                                                             \
+            /*                                                                                                         \
+             * Decrement the sample block loop counter                                                                 \
+             */                                                                                                        \
+            blkCnt--;                                                                                                  \
+        }                                                                                                              \
+                                                                                                                       \
+        /* tail */                                                                                                     \
+        int32_t residual = blockSize & 3;                                                                              \
+        switch (residual)                                                                                              \
+        {                                                                                                              \
+        case 3: {                                                                                                      \
+            for (int i = 0; i < residual; i++)                                                                         \
+                *pStateCur++ = *pTempSrc++;                                                                            \
+                                                                                                                       \
+            FIR_Q31_CORE(3, NBVECTAPS, pSamples, vecCoeffs);                                                           \
+        }                                                                                                              \
+        break;                                                                                                         \
+                                                                                                                       \
+        case 2: {                                                                                                      \
+            for (int i = 0; i < residual; i++)                                                                         \
+                *pStateCur++ = *pTempSrc++;                                                                            \
+                                                                                                                       \
+            FIR_Q31_CORE(2, NBVECTAPS, pSamples, vecCoeffs);                                                           \
+        }                                                                                                              \
+        break;                                                                                                         \
+                                                                                                                       \
+        case 1: {                                                                                                      \
+            for (int i = 0; i < residual; i++)                                                                         \
+                *pStateCur++ = *pTempSrc++;                                                                            \
+                                                                                                                       \
+            FIR_Q31_CORE(1, NBVECTAPS, pSamples, vecCoeffs);                                                           \
+        }                                                                                                              \
+        break;                                                                                                         \
+        }                                                                                                              \
+                                                                                                                       \
+        /*                                                                                                             \
+         * Copy the samples back into the history buffer start                                                         \
+         */                                                                                                            \
+        pTempSrc = &pState[blockSize];                                                                                 \
+        pTempDest = pState;                                                                                            \
+                                                                                                                       \
+        blkCnt = (numTaps - 1) >> 2;                                                                                   \
+        while (blkCnt > 0)                                                                                             \
+        {                                                                                                              \
+            vstrwq_s32(pTempDest, vldrwq_s32(pTempSrc));                                                               \
+            pTempSrc += 4;                                                                                             \
+            pTempDest += 4;                                                                                            \
+            blkCnt--;                                                                                                  \
+        }                                                                                                              \
+        blkCnt = (numTaps - 1) & 3;                                                                                    \
+        if (blkCnt > 0)                                                                                                \
+        {                                                                                                              \
+            mve_pred16_t p0 = vctp32q(blkCnt);                                                                         \
+            vstrwq_p_s32(pTempDest, vldrwq_z_s32(pTempSrc, p0), p0);                                                   \
+        }                                                                                                              \
     }
 
-static void arm_fir_q31_1_4_mve(const arm_fir_instance_q31 *S,
-                                const q31_t *__restrict pSrc,
-                                q31_t *__restrict pDst, uint32_t blockSize)
+static void arm_fir_q31_1_4_mve(const arm_fir_instance_q31 *S, const q31_t *__restrict pSrc, q31_t *__restrict pDst,
+                                uint32_t blockSize)
 {
     q31_t *pRefStatePtr = S->pState + 2 * ARM_ROUND_UP(blockSize, 4);
     q31_t *pState = pRefStatePtr;      /* State pointer */
@@ -283,8 +280,7 @@ static void arm_fir_q31_1_4_mve(const arm_fir_instance_q31 *S,
     uint32_t residual = blockSize & 3;
     switch (residual)
     {
-    case 3:
-    {
+    case 3: {
         /*
          * Save 4 input samples in the history buffer
          */
@@ -311,8 +307,7 @@ static void arm_fir_q31_1_4_mve(const arm_fir_instance_q31 *S,
     }
     break;
 
-    case 2:
-    {
+    case 2: {
         /*
          * Save 4 input samples in the history buffer
          */
@@ -334,8 +329,7 @@ static void arm_fir_q31_1_4_mve(const arm_fir_instance_q31 *S,
     }
     break;
 
-    case 1:
-    {
+    case 1: {
         /*
          * Save 4 input samples in the history buffer
          */
@@ -375,9 +369,8 @@ static void arm_fir_q31_1_4_mve(const arm_fir_instance_q31 *S,
     }
 }
 
-static void arm_fir_q31_5_8_mve(const arm_fir_instance_q31 *S,
-                                const q31_t *__restrict pSrc,
-                                q31_t *__restrict pDst, uint32_t blockSize)
+static void arm_fir_q31_5_8_mve(const arm_fir_instance_q31 *S, const q31_t *__restrict pSrc, q31_t *__restrict pDst,
+                                uint32_t blockSize)
 {
 #define NBTAPS 8
 #define NBVECTAPS (NBTAPS / 4)
@@ -386,9 +379,8 @@ static void arm_fir_q31_5_8_mve(const arm_fir_instance_q31 *S,
 #undef NBTAPS
 }
 
-static void arm_fir_q31_9_12_mve(const arm_fir_instance_q31 *S,
-                                 const q31_t *__restrict pSrc,
-                                 q31_t *__restrict pDst, uint32_t blockSize)
+static void arm_fir_q31_9_12_mve(const arm_fir_instance_q31 *S, const q31_t *__restrict pSrc, q31_t *__restrict pDst,
+                                 uint32_t blockSize)
 {
 #define NBTAPS 12
 #define NBVECTAPS (NBTAPS / 4)
@@ -397,9 +389,8 @@ static void arm_fir_q31_9_12_mve(const arm_fir_instance_q31 *S,
 #undef NBTAPS
 }
 
-static void arm_fir_q31_13_16_mve(const arm_fir_instance_q31 *S,
-                                  const q31_t *__restrict pSrc,
-                                  q31_t *__restrict pDst, uint32_t blockSize)
+static void arm_fir_q31_13_16_mve(const arm_fir_instance_q31 *S, const q31_t *__restrict pSrc, q31_t *__restrict pDst,
+                                  uint32_t blockSize)
 {
 #define NBTAPS 16
 #define NBVECTAPS (NBTAPS / 4)
@@ -408,9 +399,8 @@ static void arm_fir_q31_13_16_mve(const arm_fir_instance_q31 *S,
 #undef NBTAPS
 }
 
-static void arm_fir_q31_17_20_mve(const arm_fir_instance_q31 *S,
-                                  const q31_t *__restrict pSrc,
-                                  q31_t *__restrict pDst, uint32_t blockSize)
+static void arm_fir_q31_17_20_mve(const arm_fir_instance_q31 *S, const q31_t *__restrict pSrc, q31_t *__restrict pDst,
+                                  uint32_t blockSize)
 {
 #define NBTAPS 20
 #define NBVECTAPS (NBTAPS / 4)
@@ -419,9 +409,8 @@ static void arm_fir_q31_17_20_mve(const arm_fir_instance_q31 *S,
 #undef NBTAPS
 }
 
-static void arm_fir_q31_21_24_mve(const arm_fir_instance_q31 *S,
-                                  const q31_t *__restrict pSrc,
-                                  q31_t *__restrict pDst, uint32_t blockSize)
+static void arm_fir_q31_21_24_mve(const arm_fir_instance_q31 *S, const q31_t *__restrict pSrc, q31_t *__restrict pDst,
+                                  uint32_t blockSize)
 {
 #define NBTAPS 24
 #define NBVECTAPS (NBTAPS / 4)
@@ -430,9 +419,8 @@ static void arm_fir_q31_21_24_mve(const arm_fir_instance_q31 *S,
 #undef NBTAPS
 }
 
-static void arm_fir_q31_25_28_mve(const arm_fir_instance_q31 *S,
-                                  const q31_t *__restrict pSrc,
-                                  q31_t *__restrict pDst, uint32_t blockSize)
+static void arm_fir_q31_25_28_mve(const arm_fir_instance_q31 *S, const q31_t *__restrict pSrc, q31_t *__restrict pDst,
+                                  uint32_t blockSize)
 {
 #define NBTAPS 28
 #define NBVECTAPS (NBTAPS / 4)
@@ -441,9 +429,7 @@ static void arm_fir_q31_25_28_mve(const arm_fir_instance_q31 *S,
 #undef NBTAPS
 }
 
-static void arm_fir_q31_29_32_mve(const arm_fir_instance_q31 *S,
-                                  const q31_t *__restrict pSrc,
-                                  q31_t *__restrict pDst,
+static void arm_fir_q31_29_32_mve(const arm_fir_instance_q31 *S, const q31_t *__restrict pSrc, q31_t *__restrict pDst,
                                   uint32_t blockSize)
 {
     q31_t *pRefStatePtr = S->pState + 2 * ARM_ROUND_UP(blockSize, 4);
@@ -637,11 +623,7 @@ static void arm_fir_q31_29_32_mve(const arm_fir_instance_q31 *S,
     } while (blkCnt > 0);
 }
 
-ARM_DSP_ATTRIBUTE void arm_fir_q31(
-    const arm_fir_instance_q31 *S,
-    const q31_t *pSrc,
-    q31_t *pDst,
-    uint32_t blockSize)
+ARM_DSP_ATTRIBUTE void arm_fir_q31(const arm_fir_instance_q31 *S, const q31_t *pSrc, q31_t *pDst, uint32_t blockSize)
 {
     q31_t *pRefStatePtr = S->pState + 2 * ARM_ROUND_UP(blockSize, 4);
     q31_t *pState = pRefStatePtr;      /* State pointer */
@@ -778,8 +760,7 @@ ARM_DSP_ATTRIBUTE void arm_fir_q31(
     int32_t residual = blockSize & 3;
     switch (residual)
     {
-    case 3:
-    {
+    case 3: {
         const q31_t *pCoeffsTmp = pCoeffs;
         const q31_t *pSamplesTmp = pSamples;
 
@@ -823,8 +804,7 @@ ARM_DSP_ATTRIBUTE void arm_fir_q31(
     }
     break;
 
-    case 2:
-    {
+    case 2: {
         const q31_t *pCoeffsTmp = pCoeffs;
         const q31_t *pSamplesTmp = pSamples;
 
@@ -862,8 +842,7 @@ ARM_DSP_ATTRIBUTE void arm_fir_q31(
     }
     break;
 
-    case 1:
-    {
+    case 1: {
         const q31_t *pCoeffsTmp = pCoeffs;
         const q31_t *pSamplesTmp = pSamples;
 
@@ -922,526 +901,531 @@ ARM_DSP_ATTRIBUTE void arm_fir_q31(
 
 #if defined(ARM_MATH_NEON)
 
-#define ARM_UPDATE_SUM_FIR_Q31_1(b, x0, x1)                  \
-    accv0LO = vmlal_n_s32(accv0LO, vget_low_s32(x0), b[0]);  \
-    accv0HI = vmlal_n_s32(accv0HI, vget_high_s32(x0), b[0]); \
-    accv1LO = vmlal_n_s32(accv1LO, vget_low_s32(x1), b[0]);  \
+#define ARM_UPDATE_SUM_FIR_Q31_1(b, x0, x1)                                                                            \
+    accv0LO = vmlal_n_s32(accv0LO, vget_low_s32(x0), b[0]);                                                            \
+    accv0HI = vmlal_n_s32(accv0HI, vget_high_s32(x0), b[0]);                                                           \
+    accv1LO = vmlal_n_s32(accv1LO, vget_low_s32(x1), b[0]);                                                            \
     accv1HI = vmlal_n_s32(accv1HI, vget_high_s32(x1), b[0]);
 
-#define ARM_UPDATE_SUM_FIR_Q31_2(b, x0, x1, x2)              \
-    accv0LO = vmlal_n_s32(accv0LO, vget_low_s32(x0), b[0]);  \
-    accv0HI = vmlal_n_s32(accv0HI, vget_high_s32(x0), b[0]); \
-    accv1LO = vmlal_n_s32(accv1LO, vget_low_s32(x1), b[0]);  \
-    accv1HI = vmlal_n_s32(accv1HI, vget_high_s32(x1), b[0]); \
-                                                             \
-    xa = vextq_u32(x0, x1, 1);                               \
-    xb = vextq_u32(x1, x2, 1);                               \
-    accv0LO = vmlal_n_s32(accv0LO, vget_low_s32(xa), b[1]);  \
-    accv0HI = vmlal_n_s32(accv0HI, vget_high_s32(xa), b[1]); \
-    accv1LO = vmlal_n_s32(accv1LO, vget_low_s32(xb), b[1]);  \
+#define ARM_UPDATE_SUM_FIR_Q31_2(b, x0, x1, x2)                                                                        \
+    accv0LO = vmlal_n_s32(accv0LO, vget_low_s32(x0), b[0]);                                                            \
+    accv0HI = vmlal_n_s32(accv0HI, vget_high_s32(x0), b[0]);                                                           \
+    accv1LO = vmlal_n_s32(accv1LO, vget_low_s32(x1), b[0]);                                                            \
+    accv1HI = vmlal_n_s32(accv1HI, vget_high_s32(x1), b[0]);                                                           \
+                                                                                                                       \
+    xa = vextq_u32(x0, x1, 1);                                                                                         \
+    xb = vextq_u32(x1, x2, 1);                                                                                         \
+    accv0LO = vmlal_n_s32(accv0LO, vget_low_s32(xa), b[1]);                                                            \
+    accv0HI = vmlal_n_s32(accv0HI, vget_high_s32(xa), b[1]);                                                           \
+    accv1LO = vmlal_n_s32(accv1LO, vget_low_s32(xb), b[1]);                                                            \
     accv1HI = vmlal_n_s32(accv1HI, vget_high_s32(xb), b[1]);
 
-#define ARM_UPDATE_SUM_FIR_Q31_3(b, x0, x1, x2)              \
-    accv0LO = vmlal_n_s32(accv0LO, vget_low_s32(x0), b[0]);  \
-    accv0HI = vmlal_n_s32(accv0HI, vget_high_s32(x0), b[0]); \
-    accv1LO = vmlal_n_s32(accv1LO, vget_low_s32(x1), b[0]);  \
-    accv1HI = vmlal_n_s32(accv1HI, vget_high_s32(x1), b[0]); \
-                                                             \
-    xa = vextq_u32(x0, x1, 1);                               \
-    xb = vextq_u32(x1, x2, 1);                               \
-    accv0LO = vmlal_n_s32(accv0LO, vget_low_s32(xa), b[1]);  \
-    accv0HI = vmlal_n_s32(accv0HI, vget_high_s32(xa), b[1]); \
-    accv1LO = vmlal_n_s32(accv1LO, vget_low_s32(xb), b[1]);  \
-    accv1HI = vmlal_n_s32(accv1HI, vget_high_s32(xb), b[1]); \
-                                                             \
-    xa = vextq_u32(x0, x1, 2);                               \
-    xb = vextq_u32(x1, x2, 2);                               \
-    accv0LO = vmlal_n_s32(accv0LO, vget_low_s32(xa), b[2]);  \
-    accv0HI = vmlal_n_s32(accv0HI, vget_high_s32(xa), b[2]); \
-    accv1LO = vmlal_n_s32(accv1LO, vget_low_s32(xb), b[2]);  \
+#define ARM_UPDATE_SUM_FIR_Q31_3(b, x0, x1, x2)                                                                        \
+    accv0LO = vmlal_n_s32(accv0LO, vget_low_s32(x0), b[0]);                                                            \
+    accv0HI = vmlal_n_s32(accv0HI, vget_high_s32(x0), b[0]);                                                           \
+    accv1LO = vmlal_n_s32(accv1LO, vget_low_s32(x1), b[0]);                                                            \
+    accv1HI = vmlal_n_s32(accv1HI, vget_high_s32(x1), b[0]);                                                           \
+                                                                                                                       \
+    xa = vextq_u32(x0, x1, 1);                                                                                         \
+    xb = vextq_u32(x1, x2, 1);                                                                                         \
+    accv0LO = vmlal_n_s32(accv0LO, vget_low_s32(xa), b[1]);                                                            \
+    accv0HI = vmlal_n_s32(accv0HI, vget_high_s32(xa), b[1]);                                                           \
+    accv1LO = vmlal_n_s32(accv1LO, vget_low_s32(xb), b[1]);                                                            \
+    accv1HI = vmlal_n_s32(accv1HI, vget_high_s32(xb), b[1]);                                                           \
+                                                                                                                       \
+    xa = vextq_u32(x0, x1, 2);                                                                                         \
+    xb = vextq_u32(x1, x2, 2);                                                                                         \
+    accv0LO = vmlal_n_s32(accv0LO, vget_low_s32(xa), b[2]);                                                            \
+    accv0HI = vmlal_n_s32(accv0HI, vget_high_s32(xa), b[2]);                                                           \
+    accv1LO = vmlal_n_s32(accv1LO, vget_low_s32(xb), b[2]);                                                            \
     accv1HI = vmlal_n_s32(accv1HI, vget_high_s32(xb), b[2]);
 
-#define ARM_UPDATE_SUM_FIR_Q31(b, x0, x1, x2)                \
-    accv0LO = vmlal_n_s32(accv0LO, vget_low_s32(x0), b[0]);  \
-    accv0HI = vmlal_n_s32(accv0HI, vget_high_s32(x0), b[0]); \
-    accv1LO = vmlal_n_s32(accv1LO, vget_low_s32(x1), b[0]);  \
-    accv1HI = vmlal_n_s32(accv1HI, vget_high_s32(x1), b[0]); \
-                                                             \
-    xa = vextq_u32(x0, x1, 1);                               \
-    xb = vextq_u32(x1, x2, 1);                               \
-    accv0LO = vmlal_n_s32(accv0LO, vget_low_s32(xa), b[1]);  \
-    accv0HI = vmlal_n_s32(accv0HI, vget_high_s32(xa), b[1]); \
-    accv1LO = vmlal_n_s32(accv1LO, vget_low_s32(xb), b[1]);  \
-    accv1HI = vmlal_n_s32(accv1HI, vget_high_s32(xb), b[1]); \
-                                                             \
-    xa = vextq_u32(x0, x1, 2);                               \
-    xb = vextq_u32(x1, x2, 2);                               \
-    accv0LO = vmlal_n_s32(accv0LO, vget_low_s32(xa), b[2]);  \
-    accv0HI = vmlal_n_s32(accv0HI, vget_high_s32(xa), b[2]); \
-    accv1LO = vmlal_n_s32(accv1LO, vget_low_s32(xb), b[2]);  \
-    accv1HI = vmlal_n_s32(accv1HI, vget_high_s32(xb), b[2]); \
-                                                             \
-    xa = vextq_u32(x0, x1, 3);                               \
-    xb = vextq_u32(x1, x2, 3);                               \
-    accv0LO = vmlal_n_s32(accv0LO, vget_low_s32(xa), b[3]);  \
-    accv0HI = vmlal_n_s32(accv0HI, vget_high_s32(xa), b[3]); \
-    accv1LO = vmlal_n_s32(accv1LO, vget_low_s32(xb), b[3]);  \
+#define ARM_UPDATE_SUM_FIR_Q31(b, x0, x1, x2)                                                                          \
+    accv0LO = vmlal_n_s32(accv0LO, vget_low_s32(x0), b[0]);                                                            \
+    accv0HI = vmlal_n_s32(accv0HI, vget_high_s32(x0), b[0]);                                                           \
+    accv1LO = vmlal_n_s32(accv1LO, vget_low_s32(x1), b[0]);                                                            \
+    accv1HI = vmlal_n_s32(accv1HI, vget_high_s32(x1), b[0]);                                                           \
+                                                                                                                       \
+    xa = vextq_u32(x0, x1, 1);                                                                                         \
+    xb = vextq_u32(x1, x2, 1);                                                                                         \
+    accv0LO = vmlal_n_s32(accv0LO, vget_low_s32(xa), b[1]);                                                            \
+    accv0HI = vmlal_n_s32(accv0HI, vget_high_s32(xa), b[1]);                                                           \
+    accv1LO = vmlal_n_s32(accv1LO, vget_low_s32(xb), b[1]);                                                            \
+    accv1HI = vmlal_n_s32(accv1HI, vget_high_s32(xb), b[1]);                                                           \
+                                                                                                                       \
+    xa = vextq_u32(x0, x1, 2);                                                                                         \
+    xb = vextq_u32(x1, x2, 2);                                                                                         \
+    accv0LO = vmlal_n_s32(accv0LO, vget_low_s32(xa), b[2]);                                                            \
+    accv0HI = vmlal_n_s32(accv0HI, vget_high_s32(xa), b[2]);                                                           \
+    accv1LO = vmlal_n_s32(accv1LO, vget_low_s32(xb), b[2]);                                                            \
+    accv1HI = vmlal_n_s32(accv1HI, vget_high_s32(xb), b[2]);                                                           \
+                                                                                                                       \
+    xa = vextq_u32(x0, x1, 3);                                                                                         \
+    xb = vextq_u32(x1, x2, 3);                                                                                         \
+    accv0LO = vmlal_n_s32(accv0LO, vget_low_s32(xa), b[3]);                                                            \
+    accv0HI = vmlal_n_s32(accv0HI, vget_high_s32(xa), b[3]);                                                           \
+    accv1LO = vmlal_n_s32(accv1LO, vget_low_s32(xb), b[3]);                                                            \
     accv1HI = vmlal_n_s32(accv1HI, vget_high_s32(xb), b[3]);
 
-#define ARM_START_OF_FUNCTION_COMMON_FIR_Q31()                                                \
-    /* S->pState points to state array which contains previous frame (numTaps - 1) samples */ \
-    /* pStateCurnt points to the location where the new input data should be written */       \
-    pStateCurnt = &(S->pState[(numTaps - 1U)]);                                               \
-                                                                                              \
-    /* Initialize blkCnt with blockSize */                                                    \
-    blkCnt = blockSize >> 3;                                                                  \
-    while (blkCnt > 0U)                                                                       \
-    {                                                                                         \
-        /* Copy one sample at a time into state buffer */                                     \
-        samples0 = vld1q_s32(pSrc);                                                           \
-        vst1q_s32(pStateCurnt, samples0);                                                     \
-                                                                                              \
-        pStateCurnt += 4;                                                                     \
-        pSrc += 4;                                                                            \
-                                                                                              \
-        samples1 = vld1q_s32(pSrc);                                                           \
-        vst1q_s32(pStateCurnt, samples1);                                                     \
-                                                                                              \
-        pStateCurnt += 4;                                                                     \
-        pSrc += 4;                                                                            \
-        /* Set the accumulator to zero */                                                     \
-        accv0LO = vdupq_n_s64(0);                                                             \
-        accv0HI = vdupq_n_s64(0);                                                             \
-        accv1LO = vdupq_n_s64(0);                                                             \
-        accv1HI = vdupq_n_s64(0);                                                             \
-                                                                                              \
-        /* Initialize state pointer */                                                        \
-        px = pState;                                                                          \
-                                                                                              \
-        /* Initialize Coefficient pointer */                                                  \
+#define ARM_START_OF_FUNCTION_COMMON_FIR_Q31()                                                                         \
+    /* S->pState points to state array which contains previous frame (numTaps - 1) samples */                          \
+    /* pStateCurnt points to the location where the new input data should be written */                                \
+    pStateCurnt = &(S->pState[(numTaps - 1U)]);                                                                        \
+                                                                                                                       \
+    /* Initialize blkCnt with blockSize */                                                                             \
+    blkCnt = blockSize >> 3;                                                                                           \
+    while (blkCnt > 0U)                                                                                                \
+    {                                                                                                                  \
+        /* Copy one sample at a time into state buffer */                                                              \
+        samples0 = vld1q_s32(pSrc);                                                                                    \
+        vst1q_s32(pStateCurnt, samples0);                                                                              \
+                                                                                                                       \
+        pStateCurnt += 4;                                                                                              \
+        pSrc += 4;                                                                                                     \
+                                                                                                                       \
+        samples1 = vld1q_s32(pSrc);                                                                                    \
+        vst1q_s32(pStateCurnt, samples1);                                                                              \
+                                                                                                                       \
+        pStateCurnt += 4;                                                                                              \
+        pSrc += 4;                                                                                                     \
+        /* Set the accumulator to zero */                                                                              \
+        accv0LO = vdupq_n_s64(0);                                                                                      \
+        accv0HI = vdupq_n_s64(0);                                                                                      \
+        accv1LO = vdupq_n_s64(0);                                                                                      \
+        accv1HI = vdupq_n_s64(0);                                                                                      \
+                                                                                                                       \
+        /* Initialize state pointer */                                                                                 \
+        px = pState;                                                                                                   \
+                                                                                                                       \
+        /* Initialize Coefficient pointer */                                                                           \
         pb = pCoeffs;
 
-#define ARM_END_OF_FUNCTION_COMMON_FIR_Q31()                                                                                             \
-    tempLO = vshrn_n_s64(accv0LO, 31);                                                                                                   \
-    tempHI = vshrn_n_s64(accv0HI, 31);                                                                                                   \
-    accv0 = vcombine_s32(tempLO, tempHI);                                                                                                \
-                                                                                                                                         \
-    /* The result is stored in the destination buffer. */                                                                                \
-    vst1q_s32(pDst, accv0);                                                                                                              \
-    pDst += 4;                                                                                                                           \
-                                                                                                                                         \
-    tempLO = vshrn_n_s64(accv1LO, 31);                                                                                                   \
-    tempHI = vshrn_n_s64(accv1HI, 31);                                                                                                   \
-    accv1 = vcombine_s32(tempLO, tempHI);                                                                                                \
-                                                                                                                                         \
-    vst1q_s32(pDst, accv1);                                                                                                              \
-    pDst += 4;                                                                                                                           \
-                                                                                                                                         \
-    /* Advance state pointer by 1 for the next sample */                                                                                 \
-    pState = pState + 8;                                                                                                                 \
-                                                                                                                                         \
-    blkCnt--;                                                                                                                            \
-    }                                                                                                                                    \
-                                                                                                                                         \
-    blkCnt = blockSize & 0x7;                                                                                                            \
-    while (blkCnt > 0U)                                                                                                                  \
-    {                                                                                                                                    \
-        /* Copy one sample at a time into state buffer */                                                                                \
-        *pStateCurnt++ = *pSrc++;                                                                                                        \
-                                                                                                                                         \
-        /* Set the accumulator to zero */                                                                                                \
-        acc = 0;                                                                                                                         \
-                                                                                                                                         \
-        /* Initialize state pointer */                                                                                                   \
-        px = pState;                                                                                                                     \
-                                                                                                                                         \
-        /* Initialize Coefficient pointer */                                                                                             \
-        pb = pCoeffs;                                                                                                                    \
-                                                                                                                                         \
-        uint32_t i = numTaps;                                                                                                            \
-                                                                                                                                         \
-        /* Perform the multiply-accumulates */                                                                                           \
-        do                                                                                                                               \
-        {                                                                                                                                \
-            /* acc =  b[numTaps-1] * x[n-numTaps-1] + b[numTaps-2] * x[n-numTaps-2] + b[numTaps-3] * x[n-numTaps-3] +...+ b[0] * x[0] */ \
-            acc += (q63_t) * px++ * *pb++;                                                                                               \
-            i--;                                                                                                                         \
-                                                                                                                                         \
-        } while (i > 0U);                                                                                                                \
-                                                                                                                                         \
-        /* The result is stored in the destination buffer. */                                                                            \
-        *pDst++ = (q31_t)(acc >> 31U);                                                                                                   \
-                                                                                                                                         \
-        /* Advance state pointer by 1 for the next sample */                                                                             \
-        pState = pState + 1;                                                                                                             \
-                                                                                                                                         \
-        blkCnt--;                                                                                                                        \
-    }                                                                                                                                    \
-                                                                                                                                         \
-    /* Processing is complete.                                                                                                           \
-    ** Now copy the last numTaps - 1 samples to the starting of the state buffer.                                                        \
-    ** This prepares the state buffer for the next function call. */                                                                     \
-                                                                                                                                         \
-    /* Points to the start of the state buffer */                                                                                        \
-    pStateCurnt = S->pState;                                                                                                             \
-                                                                                                                                         \
-    /* Copy numTaps number of values */                                                                                                  \
-    tapCnt = numTaps - 1U;                                                                                                               \
-                                                                                                                                         \
-    /* Copy data */                                                                                                                      \
-    while (tapCnt > 0U)                                                                                                                  \
-    {                                                                                                                                    \
-        *pStateCurnt++ = *pState++;                                                                                                      \
-                                                                                                                                         \
-        /* Decrement the loop counter */                                                                                                 \
-        tapCnt--;                                                                                                                        \
+#define ARM_END_OF_FUNCTION_COMMON_FIR_Q31()                                                                           \
+    tempLO = vshrn_n_s64(accv0LO, 31);                                                                                 \
+    tempHI = vshrn_n_s64(accv0HI, 31);                                                                                 \
+    accv0 = vcombine_s32(tempLO, tempHI);                                                                              \
+                                                                                                                       \
+    /* The result is stored in the destination buffer. */                                                              \
+    vst1q_s32(pDst, accv0);                                                                                            \
+    pDst += 4;                                                                                                         \
+                                                                                                                       \
+    tempLO = vshrn_n_s64(accv1LO, 31);                                                                                 \
+    tempHI = vshrn_n_s64(accv1HI, 31);                                                                                 \
+    accv1 = vcombine_s32(tempLO, tempHI);                                                                              \
+                                                                                                                       \
+    vst1q_s32(pDst, accv1);                                                                                            \
+    pDst += 4;                                                                                                         \
+                                                                                                                       \
+    /* Advance state pointer by 1 for the next sample */                                                               \
+    pState = pState + 8;                                                                                               \
+                                                                                                                       \
+    blkCnt--;                                                                                                          \
+    }                                                                                                                  \
+                                                                                                                       \
+    blkCnt = blockSize & 0x7;                                                                                          \
+    while (blkCnt > 0U)                                                                                                \
+    {                                                                                                                  \
+        /* Copy one sample at a time into state buffer */                                                              \
+        *pStateCurnt++ = *pSrc++;                                                                                      \
+                                                                                                                       \
+        /* Set the accumulator to zero */                                                                              \
+        acc = 0;                                                                                                       \
+                                                                                                                       \
+        /* Initialize state pointer */                                                                                 \
+        px = pState;                                                                                                   \
+                                                                                                                       \
+        /* Initialize Coefficient pointer */                                                                           \
+        pb = pCoeffs;                                                                                                  \
+                                                                                                                       \
+        uint32_t i = numTaps;                                                                                          \
+                                                                                                                       \
+        /* Perform the multiply-accumulates */                                                                         \
+        do                                                                                                             \
+        {                                                                                                              \
+            /* acc =  b[numTaps-1] * x[n-numTaps-1] + b[numTaps-2] * x[n-numTaps-2] + b[numTaps-3] * x[n-numTaps-3]    \
+             * +...+ b[0] * x[0] */                                                                                    \
+            acc += (q63_t) * px++ * *pb++;                                                                             \
+            i--;                                                                                                       \
+                                                                                                                       \
+        } while (i > 0U);                                                                                              \
+                                                                                                                       \
+        /* The result is stored in the destination buffer. */                                                          \
+        *pDst++ = (q31_t)(acc >> 31U);                                                                                 \
+                                                                                                                       \
+        /* Advance state pointer by 1 for the next sample */                                                           \
+        pState = pState + 1;                                                                                           \
+                                                                                                                       \
+        blkCnt--;                                                                                                      \
+    }                                                                                                                  \
+                                                                                                                       \
+    /* Processing is complete.                                                                                         \
+    ** Now copy the last numTaps - 1 samples to the starting of the state buffer.                                      \
+    ** This prepares the state buffer for the next function call. */                                                   \
+                                                                                                                       \
+    /* Points to the start of the state buffer */                                                                      \
+    pStateCurnt = S->pState;                                                                                           \
+                                                                                                                       \
+    /* Copy numTaps number of values */                                                                                \
+    tapCnt = numTaps - 1U;                                                                                             \
+                                                                                                                       \
+    /* Copy data */                                                                                                    \
+    while (tapCnt > 0U)                                                                                                \
+    {                                                                                                                  \
+        *pStateCurnt++ = *pState++;                                                                                    \
+                                                                                                                       \
+        /* Decrement the loop counter */                                                                               \
+        tapCnt--;                                                                                                      \
     }
 
-#define ARM_INNER_LOOP_TAPS_32_35_FIR_Q31()                                                                                      \
-    x0 = vld1q_s32(px);                                                                                                          \
-    x1 = vld1q_s32(px + 4);                                                                                                      \
-    x2 = vld1q_s32(px + 8);                                                                                                      \
-                                                                                                                                 \
-    /* acc =  b[numTaps-1] * x[n-numTaps-1] + b[numTaps-2] * x[n-numTaps-2] + b[numTaps-3] * x[n-numTaps-3] +...+ b[0] * x[0] */ \
-    ARM_UPDATE_SUM_FIR_Q31(b[0], x0, x1, x2);                                                                                    \
-    x0 = vld1q_s32(px + 12);                                                                                                     \
-    ARM_UPDATE_SUM_FIR_Q31(b[1], x1, x2, x0);                                                                                    \
-    x1 = vld1q_s32(px + 16);                                                                                                     \
-    ARM_UPDATE_SUM_FIR_Q31(b[2], x2, x0, x1);                                                                                    \
-    x2 = vld1q_s32(px + 20);                                                                                                     \
-    ARM_UPDATE_SUM_FIR_Q31(b[3], x0, x1, x2);                                                                                    \
-    x0 = vld1q_s32(px + 24);                                                                                                     \
-    ARM_UPDATE_SUM_FIR_Q31(b[4], x1, x2, x0);                                                                                    \
-    x1 = vld1q_s32(px + 28);                                                                                                     \
-    ARM_UPDATE_SUM_FIR_Q31(b[5], x2, x0, x1);                                                                                    \
-    x2 = vld1q_s32(px + 32);                                                                                                     \
-    ARM_UPDATE_SUM_FIR_Q31(b[6], x0, x1, x2);                                                                                    \
-                                                                                                                                 \
-    x0 = vld1q_s32(px + 36);                                                                                                     \
-    ARM_UPDATE_SUM_FIR_Q31(b[7], x1, x2, x0);                                                                                    \
-                                                                                                                                 \
-    switch (nTail)                                                                                                               \
-    {                                                                                                                            \
-    case 0:                                                                                                                      \
-        break;                                                                                                                   \
-    case 1:                                                                                                                      \
-        x1 = vld1q_s32(px + nTaps * 4 + 8);                                                                                      \
-        b[8] = vld1q_s32(pb + (nTaps) * 4);                                                                                      \
-        ARM_UPDATE_SUM_FIR_Q31_1(b[8], x2, x0);                                                                                  \
-        break;                                                                                                                   \
-    case 2:                                                                                                                      \
-        x1 = vld1q_s32(px + (nTaps) * 4 + 8);                                                                                    \
-        b[8] = vld1q_s32(pb + (nTaps) * 4);                                                                                      \
-        ARM_UPDATE_SUM_FIR_Q31_2(b[8], x2, x0, x1);                                                                              \
-        break;                                                                                                                   \
-    case 3:                                                                                                                      \
-        x1 = vld1q_s32(px + nTaps * 4 + 8);                                                                                      \
-        b[8] = vld1q_s32(pb + (nTaps) * 4);                                                                                      \
-        ARM_UPDATE_SUM_FIR_Q31_3(b[8], x2, x0, x1);                                                                              \
-        break;                                                                                                                   \
-    default:                                                                                                                     \
-        break;                                                                                                                   \
+#define ARM_INNER_LOOP_TAPS_32_35_FIR_Q31()                                                                            \
+    x0 = vld1q_s32(px);                                                                                                \
+    x1 = vld1q_s32(px + 4);                                                                                            \
+    x2 = vld1q_s32(px + 8);                                                                                            \
+                                                                                                                       \
+    /* acc =  b[numTaps-1] * x[n-numTaps-1] + b[numTaps-2] * x[n-numTaps-2] + b[numTaps-3] * x[n-numTaps-3] +...+ b[0] \
+     * * x[0] */                                                                                                       \
+    ARM_UPDATE_SUM_FIR_Q31(b[0], x0, x1, x2);                                                                          \
+    x0 = vld1q_s32(px + 12);                                                                                           \
+    ARM_UPDATE_SUM_FIR_Q31(b[1], x1, x2, x0);                                                                          \
+    x1 = vld1q_s32(px + 16);                                                                                           \
+    ARM_UPDATE_SUM_FIR_Q31(b[2], x2, x0, x1);                                                                          \
+    x2 = vld1q_s32(px + 20);                                                                                           \
+    ARM_UPDATE_SUM_FIR_Q31(b[3], x0, x1, x2);                                                                          \
+    x0 = vld1q_s32(px + 24);                                                                                           \
+    ARM_UPDATE_SUM_FIR_Q31(b[4], x1, x2, x0);                                                                          \
+    x1 = vld1q_s32(px + 28);                                                                                           \
+    ARM_UPDATE_SUM_FIR_Q31(b[5], x2, x0, x1);                                                                          \
+    x2 = vld1q_s32(px + 32);                                                                                           \
+    ARM_UPDATE_SUM_FIR_Q31(b[6], x0, x1, x2);                                                                          \
+                                                                                                                       \
+    x0 = vld1q_s32(px + 36);                                                                                           \
+    ARM_UPDATE_SUM_FIR_Q31(b[7], x1, x2, x0);                                                                          \
+                                                                                                                       \
+    switch (nTail)                                                                                                     \
+    {                                                                                                                  \
+    case 0:                                                                                                            \
+        break;                                                                                                         \
+    case 1:                                                                                                            \
+        x1 = vld1q_s32(px + nTaps * 4 + 8);                                                                            \
+        b[8] = vld1q_s32(pb + (nTaps) * 4);                                                                            \
+        ARM_UPDATE_SUM_FIR_Q31_1(b[8], x2, x0);                                                                        \
+        break;                                                                                                         \
+    case 2:                                                                                                            \
+        x1 = vld1q_s32(px + (nTaps) * 4 + 8);                                                                          \
+        b[8] = vld1q_s32(pb + (nTaps) * 4);                                                                            \
+        ARM_UPDATE_SUM_FIR_Q31_2(b[8], x2, x0, x1);                                                                    \
+        break;                                                                                                         \
+    case 3:                                                                                                            \
+        x1 = vld1q_s32(px + nTaps * 4 + 8);                                                                            \
+        b[8] = vld1q_s32(pb + (nTaps) * 4);                                                                            \
+        ARM_UPDATE_SUM_FIR_Q31_3(b[8], x2, x0, x1);                                                                    \
+        break;                                                                                                         \
+    default:                                                                                                           \
+        break;                                                                                                         \
     }
 
-#define ARM_INNER_LOOP_TAPS_28_31_FIR_Q31()                                                                                      \
-    x0 = vld1q_s32(px);                                                                                                          \
-    x1 = vld1q_s32(px + 4);                                                                                                      \
-    x2 = vld1q_s32(px + 8);                                                                                                      \
-                                                                                                                                 \
-    /* acc =  b[numTaps-1] * x[n-numTaps-1] + b[numTaps-2] * x[n-numTaps-2] + b[numTaps-3] * x[n-numTaps-3] +...+ b[0] * x[0] */ \
-    ARM_UPDATE_SUM_FIR_Q31(b[0], x0, x1, x2);                                                                                    \
-    x0 = vld1q_s32(px + 12);                                                                                                     \
-    ARM_UPDATE_SUM_FIR_Q31(b[1], x1, x2, x0);                                                                                    \
-    x1 = vld1q_s32(px + 16);                                                                                                     \
-    ARM_UPDATE_SUM_FIR_Q31(b[2], x2, x0, x1);                                                                                    \
-    x2 = vld1q_s32(px + 20);                                                                                                     \
-    ARM_UPDATE_SUM_FIR_Q31(b[3], x0, x1, x2);                                                                                    \
-    x0 = vld1q_s32(px + 24);                                                                                                     \
-    ARM_UPDATE_SUM_FIR_Q31(b[4], x1, x2, x0);                                                                                    \
-    x1 = vld1q_s32(px + 28);                                                                                                     \
-    ARM_UPDATE_SUM_FIR_Q31(b[5], x2, x0, x1);                                                                                    \
-    x2 = vld1q_s32(px + 32);                                                                                                     \
-    ARM_UPDATE_SUM_FIR_Q31(b[6], x0, x1, x2);                                                                                    \
-                                                                                                                                 \
-    switch (nTail)                                                                                                               \
-    {                                                                                                                            \
-    case 0:                                                                                                                      \
-        break;                                                                                                                   \
-    case 1:                                                                                                                      \
-        x0 = vld1q_s32(px + nTaps * 4 + 8);                                                                                      \
-        b[7] = vld1q_s32(pb + (nTaps) * 4);                                                                                      \
-        ARM_UPDATE_SUM_FIR_Q31_1(b[7], x1, x2)                                                                                   \
-        break;                                                                                                                   \
-    case 2:                                                                                                                      \
-        x0 = vld1q_s32(px + (nTaps) * 4 + 8);                                                                                    \
-        b[7] = vld1q_s32(pb + (nTaps) * 4);                                                                                      \
-        ARM_UPDATE_SUM_FIR_Q31_2(b[7], x1, x2, x0);                                                                              \
-        break;                                                                                                                   \
-    case 3:                                                                                                                      \
-        x0 = vld1q_s32(px + nTaps * 4 + 8);                                                                                      \
-        b[7] = vld1q_s32(pb + (nTaps) * 4);                                                                                      \
-        ARM_UPDATE_SUM_FIR_Q31_3(b[7], x1, x2, x0);                                                                              \
-        break;                                                                                                                   \
-    default:                                                                                                                     \
-        break;                                                                                                                   \
+#define ARM_INNER_LOOP_TAPS_28_31_FIR_Q31()                                                                            \
+    x0 = vld1q_s32(px);                                                                                                \
+    x1 = vld1q_s32(px + 4);                                                                                            \
+    x2 = vld1q_s32(px + 8);                                                                                            \
+                                                                                                                       \
+    /* acc =  b[numTaps-1] * x[n-numTaps-1] + b[numTaps-2] * x[n-numTaps-2] + b[numTaps-3] * x[n-numTaps-3] +...+ b[0] \
+     * * x[0] */                                                                                                       \
+    ARM_UPDATE_SUM_FIR_Q31(b[0], x0, x1, x2);                                                                          \
+    x0 = vld1q_s32(px + 12);                                                                                           \
+    ARM_UPDATE_SUM_FIR_Q31(b[1], x1, x2, x0);                                                                          \
+    x1 = vld1q_s32(px + 16);                                                                                           \
+    ARM_UPDATE_SUM_FIR_Q31(b[2], x2, x0, x1);                                                                          \
+    x2 = vld1q_s32(px + 20);                                                                                           \
+    ARM_UPDATE_SUM_FIR_Q31(b[3], x0, x1, x2);                                                                          \
+    x0 = vld1q_s32(px + 24);                                                                                           \
+    ARM_UPDATE_SUM_FIR_Q31(b[4], x1, x2, x0);                                                                          \
+    x1 = vld1q_s32(px + 28);                                                                                           \
+    ARM_UPDATE_SUM_FIR_Q31(b[5], x2, x0, x1);                                                                          \
+    x2 = vld1q_s32(px + 32);                                                                                           \
+    ARM_UPDATE_SUM_FIR_Q31(b[6], x0, x1, x2);                                                                          \
+                                                                                                                       \
+    switch (nTail)                                                                                                     \
+    {                                                                                                                  \
+    case 0:                                                                                                            \
+        break;                                                                                                         \
+    case 1:                                                                                                            \
+        x0 = vld1q_s32(px + nTaps * 4 + 8);                                                                            \
+        b[7] = vld1q_s32(pb + (nTaps) * 4);                                                                            \
+        ARM_UPDATE_SUM_FIR_Q31_1(b[7], x1, x2)                                                                         \
+        break;                                                                                                         \
+    case 2:                                                                                                            \
+        x0 = vld1q_s32(px + (nTaps) * 4 + 8);                                                                          \
+        b[7] = vld1q_s32(pb + (nTaps) * 4);                                                                            \
+        ARM_UPDATE_SUM_FIR_Q31_2(b[7], x1, x2, x0);                                                                    \
+        break;                                                                                                         \
+    case 3:                                                                                                            \
+        x0 = vld1q_s32(px + nTaps * 4 + 8);                                                                            \
+        b[7] = vld1q_s32(pb + (nTaps) * 4);                                                                            \
+        ARM_UPDATE_SUM_FIR_Q31_3(b[7], x1, x2, x0);                                                                    \
+        break;                                                                                                         \
+    default:                                                                                                           \
+        break;                                                                                                         \
     }
 
-#define ARM_INNER_LOOP_TAPS_24_27_FIR_Q31()                                                                                      \
-    x0 = vld1q_s32(px);                                                                                                          \
-    x1 = vld1q_s32(px + 4);                                                                                                      \
-    x2 = vld1q_s32(px + 8);                                                                                                      \
-                                                                                                                                 \
-    /* acc =  b[numTaps-1] * x[n-numTaps-1] + b[numTaps-2] * x[n-numTaps-2] + b[numTaps-3] * x[n-numTaps-3] +...+ b[0] * x[0] */ \
-    ARM_UPDATE_SUM_FIR_Q31(b[0], x0, x1, x2);                                                                                    \
-    x0 = vld1q_s32(px + 12);                                                                                                     \
-    ARM_UPDATE_SUM_FIR_Q31(b[1], x1, x2, x0);                                                                                    \
-    x1 = vld1q_s32(px + 16);                                                                                                     \
-    ARM_UPDATE_SUM_FIR_Q31(b[2], x2, x0, x1);                                                                                    \
-                                                                                                                                 \
-    x2 = vld1q_s32(px + 20);                                                                                                     \
-    ARM_UPDATE_SUM_FIR_Q31(b[3], x0, x1, x2);                                                                                    \
-                                                                                                                                 \
-    x0 = vld1q_s32(px + 24);                                                                                                     \
-    ARM_UPDATE_SUM_FIR_Q31(b[4], x1, x2, x0);                                                                                    \
-                                                                                                                                 \
-    x1 = vld1q_s32(px + 28);                                                                                                     \
-    ARM_UPDATE_SUM_FIR_Q31(b[5], x2, x0, x1);                                                                                    \
-                                                                                                                                 \
-    switch (nTail)                                                                                                               \
-    {                                                                                                                            \
-    case 0:                                                                                                                      \
-        break;                                                                                                                   \
-    case 1:                                                                                                                      \
-        x2 = vld1q_s32(px + nTaps * 4 + 8);                                                                                      \
-        b[6] = vld1q_s32(pb + (nTaps) * 4);                                                                                      \
-        ARM_UPDATE_SUM_FIR_Q31_1(b[6], x0, x1)                                                                                   \
-        break;                                                                                                                   \
-    case 2:                                                                                                                      \
-        x2 = vld1q_s32(px + (nTaps) * 4 + 8);                                                                                    \
-        b[6] = vld1q_s32(pb + (nTaps) * 4);                                                                                      \
-        ARM_UPDATE_SUM_FIR_Q31_2(b[6], x0, x1, x2);                                                                              \
-        break;                                                                                                                   \
-    case 3:                                                                                                                      \
-        x2 = vld1q_s32(px + nTaps * 4 + 8);                                                                                      \
-        b[6] = vld1q_s32(pb + (nTaps) * 4);                                                                                      \
-        ARM_UPDATE_SUM_FIR_Q31_3(b[6], x0, x1, x2);                                                                              \
-        break;                                                                                                                   \
-    default:                                                                                                                     \
-        break;                                                                                                                   \
+#define ARM_INNER_LOOP_TAPS_24_27_FIR_Q31()                                                                            \
+    x0 = vld1q_s32(px);                                                                                                \
+    x1 = vld1q_s32(px + 4);                                                                                            \
+    x2 = vld1q_s32(px + 8);                                                                                            \
+                                                                                                                       \
+    /* acc =  b[numTaps-1] * x[n-numTaps-1] + b[numTaps-2] * x[n-numTaps-2] + b[numTaps-3] * x[n-numTaps-3] +...+ b[0] \
+     * * x[0] */                                                                                                       \
+    ARM_UPDATE_SUM_FIR_Q31(b[0], x0, x1, x2);                                                                          \
+    x0 = vld1q_s32(px + 12);                                                                                           \
+    ARM_UPDATE_SUM_FIR_Q31(b[1], x1, x2, x0);                                                                          \
+    x1 = vld1q_s32(px + 16);                                                                                           \
+    ARM_UPDATE_SUM_FIR_Q31(b[2], x2, x0, x1);                                                                          \
+                                                                                                                       \
+    x2 = vld1q_s32(px + 20);                                                                                           \
+    ARM_UPDATE_SUM_FIR_Q31(b[3], x0, x1, x2);                                                                          \
+                                                                                                                       \
+    x0 = vld1q_s32(px + 24);                                                                                           \
+    ARM_UPDATE_SUM_FIR_Q31(b[4], x1, x2, x0);                                                                          \
+                                                                                                                       \
+    x1 = vld1q_s32(px + 28);                                                                                           \
+    ARM_UPDATE_SUM_FIR_Q31(b[5], x2, x0, x1);                                                                          \
+                                                                                                                       \
+    switch (nTail)                                                                                                     \
+    {                                                                                                                  \
+    case 0:                                                                                                            \
+        break;                                                                                                         \
+    case 1:                                                                                                            \
+        x2 = vld1q_s32(px + nTaps * 4 + 8);                                                                            \
+        b[6] = vld1q_s32(pb + (nTaps) * 4);                                                                            \
+        ARM_UPDATE_SUM_FIR_Q31_1(b[6], x0, x1)                                                                         \
+        break;                                                                                                         \
+    case 2:                                                                                                            \
+        x2 = vld1q_s32(px + (nTaps) * 4 + 8);                                                                          \
+        b[6] = vld1q_s32(pb + (nTaps) * 4);                                                                            \
+        ARM_UPDATE_SUM_FIR_Q31_2(b[6], x0, x1, x2);                                                                    \
+        break;                                                                                                         \
+    case 3:                                                                                                            \
+        x2 = vld1q_s32(px + nTaps * 4 + 8);                                                                            \
+        b[6] = vld1q_s32(pb + (nTaps) * 4);                                                                            \
+        ARM_UPDATE_SUM_FIR_Q31_3(b[6], x0, x1, x2);                                                                    \
+        break;                                                                                                         \
+    default:                                                                                                           \
+        break;                                                                                                         \
     }
 
-#define ARM_INNER_LOOP_TAPS_20_23_FIR_Q31()                                                                                      \
-    x0 = vld1q_s32(px);                                                                                                          \
-    x1 = vld1q_s32(px + 4);                                                                                                      \
-    x2 = vld1q_s32(px + 8);                                                                                                      \
-                                                                                                                                 \
-    /* acc =  b[numTaps-1] * x[n-numTaps-1] + b[numTaps-2] * x[n-numTaps-2] + b[numTaps-3] * x[n-numTaps-3] +...+ b[0] * x[0] */ \
-    ARM_UPDATE_SUM_FIR_Q31(b[0], x0, x1, x2);                                                                                    \
-    x0 = vld1q_s32(px + 12);                                                                                                     \
-    ARM_UPDATE_SUM_FIR_Q31(b[1], x1, x2, x0);                                                                                    \
-    x1 = vld1q_s32(px + 16);                                                                                                     \
-    ARM_UPDATE_SUM_FIR_Q31(b[2], x2, x0, x1);                                                                                    \
-                                                                                                                                 \
-    x2 = vld1q_s32(px + 20);                                                                                                     \
-    ARM_UPDATE_SUM_FIR_Q31(b[3], x0, x1, x2);                                                                                    \
-                                                                                                                                 \
-    x0 = vld1q_s32(px + 24);                                                                                                     \
-    ARM_UPDATE_SUM_FIR_Q31(b[4], x1, x2, x0);                                                                                    \
-                                                                                                                                 \
-    switch (nTail)                                                                                                               \
-    {                                                                                                                            \
-    case 0:                                                                                                                      \
-        break;                                                                                                                   \
-    case 1:                                                                                                                      \
-        x1 = vld1q_s32(px + nTaps * 4 + 8);                                                                                      \
-        b[5] = vld1q_s32(pb + (nTaps) * 4);                                                                                      \
-        ARM_UPDATE_SUM_FIR_Q31_1(b[5], x2, x0)                                                                                   \
-        break;                                                                                                                   \
-    case 2:                                                                                                                      \
-        x1 = vld1q_s32(px + (nTaps) * 4 + 8);                                                                                    \
-        b[5] = vld1q_s32(pb + (nTaps) * 4);                                                                                      \
-        ARM_UPDATE_SUM_FIR_Q31_2(b[5], x2, x0, x1);                                                                              \
-        break;                                                                                                                   \
-    case 3:                                                                                                                      \
-        x1 = vld1q_s32(px + nTaps * 4 + 8);                                                                                      \
-        b[5] = vld1q_s32(pb + (nTaps) * 4);                                                                                      \
-        ARM_UPDATE_SUM_FIR_Q31_3(b[5], x2, x0, x1);                                                                              \
-        break;                                                                                                                   \
-    default:                                                                                                                     \
-        break;                                                                                                                   \
+#define ARM_INNER_LOOP_TAPS_20_23_FIR_Q31()                                                                            \
+    x0 = vld1q_s32(px);                                                                                                \
+    x1 = vld1q_s32(px + 4);                                                                                            \
+    x2 = vld1q_s32(px + 8);                                                                                            \
+                                                                                                                       \
+    /* acc =  b[numTaps-1] * x[n-numTaps-1] + b[numTaps-2] * x[n-numTaps-2] + b[numTaps-3] * x[n-numTaps-3] +...+ b[0] \
+     * * x[0] */                                                                                                       \
+    ARM_UPDATE_SUM_FIR_Q31(b[0], x0, x1, x2);                                                                          \
+    x0 = vld1q_s32(px + 12);                                                                                           \
+    ARM_UPDATE_SUM_FIR_Q31(b[1], x1, x2, x0);                                                                          \
+    x1 = vld1q_s32(px + 16);                                                                                           \
+    ARM_UPDATE_SUM_FIR_Q31(b[2], x2, x0, x1);                                                                          \
+                                                                                                                       \
+    x2 = vld1q_s32(px + 20);                                                                                           \
+    ARM_UPDATE_SUM_FIR_Q31(b[3], x0, x1, x2);                                                                          \
+                                                                                                                       \
+    x0 = vld1q_s32(px + 24);                                                                                           \
+    ARM_UPDATE_SUM_FIR_Q31(b[4], x1, x2, x0);                                                                          \
+                                                                                                                       \
+    switch (nTail)                                                                                                     \
+    {                                                                                                                  \
+    case 0:                                                                                                            \
+        break;                                                                                                         \
+    case 1:                                                                                                            \
+        x1 = vld1q_s32(px + nTaps * 4 + 8);                                                                            \
+        b[5] = vld1q_s32(pb + (nTaps) * 4);                                                                            \
+        ARM_UPDATE_SUM_FIR_Q31_1(b[5], x2, x0)                                                                         \
+        break;                                                                                                         \
+    case 2:                                                                                                            \
+        x1 = vld1q_s32(px + (nTaps) * 4 + 8);                                                                          \
+        b[5] = vld1q_s32(pb + (nTaps) * 4);                                                                            \
+        ARM_UPDATE_SUM_FIR_Q31_2(b[5], x2, x0, x1);                                                                    \
+        break;                                                                                                         \
+    case 3:                                                                                                            \
+        x1 = vld1q_s32(px + nTaps * 4 + 8);                                                                            \
+        b[5] = vld1q_s32(pb + (nTaps) * 4);                                                                            \
+        ARM_UPDATE_SUM_FIR_Q31_3(b[5], x2, x0, x1);                                                                    \
+        break;                                                                                                         \
+    default:                                                                                                           \
+        break;                                                                                                         \
     }
 
-#define ARM_INNER_LOOP_TAPS_16_19_FIR_Q31()                                                                                      \
-    x0 = vld1q_s32(px);                                                                                                          \
-    x1 = vld1q_s32(px + 4);                                                                                                      \
-    x2 = vld1q_s32(px + 8);                                                                                                      \
-                                                                                                                                 \
-    /* acc =  b[numTaps-1] * x[n-numTaps-1] + b[numTaps-2] * x[n-numTaps-2] + b[numTaps-3] * x[n-numTaps-3] +...+ b[0] * x[0] */ \
-    ARM_UPDATE_SUM_FIR_Q31(b[0], x0, x1, x2);                                                                                    \
-    x0 = vld1q_s32(px + 12);                                                                                                     \
-    ARM_UPDATE_SUM_FIR_Q31(b[1], x1, x2, x0);                                                                                    \
-    x1 = vld1q_s32(px + 16);                                                                                                     \
-    ARM_UPDATE_SUM_FIR_Q31(b[2], x2, x0, x1);                                                                                    \
-                                                                                                                                 \
-    x2 = vld1q_s32(px + 20);                                                                                                     \
-    ARM_UPDATE_SUM_FIR_Q31(b[3], x0, x1, x2);                                                                                    \
-                                                                                                                                 \
-    switch (nTail)                                                                                                               \
-    {                                                                                                                            \
-    case 0:                                                                                                                      \
-        break;                                                                                                                   \
-    case 1:                                                                                                                      \
-        x0 = vld1q_s32(px + nTaps * 4 + 8);                                                                                      \
-        b[4] = vld1q_s32(pb + (nTaps) * 4);                                                                                      \
-        ARM_UPDATE_SUM_FIR_Q31_1(b[4], x1, x2)                                                                                   \
-        break;                                                                                                                   \
-    case 2:                                                                                                                      \
-        x0 = vld1q_s32(px + (nTaps) * 4 + 8);                                                                                    \
-        b[4] = vld1q_s32(pb + (nTaps) * 4);                                                                                      \
-        ARM_UPDATE_SUM_FIR_Q31_2(b[4], x1, x2, x0);                                                                              \
-        break;                                                                                                                   \
-    case 3:                                                                                                                      \
-        x0 = vld1q_s32(px + nTaps * 4 + 8);                                                                                      \
-        b[4] = vld1q_s32(pb + (nTaps) * 4);                                                                                      \
-        ARM_UPDATE_SUM_FIR_Q31_3(b[4], x1, x2, x0);                                                                              \
-        break;                                                                                                                   \
-    default:                                                                                                                     \
-        break;                                                                                                                   \
+#define ARM_INNER_LOOP_TAPS_16_19_FIR_Q31()                                                                            \
+    x0 = vld1q_s32(px);                                                                                                \
+    x1 = vld1q_s32(px + 4);                                                                                            \
+    x2 = vld1q_s32(px + 8);                                                                                            \
+                                                                                                                       \
+    /* acc =  b[numTaps-1] * x[n-numTaps-1] + b[numTaps-2] * x[n-numTaps-2] + b[numTaps-3] * x[n-numTaps-3] +...+ b[0] \
+     * * x[0] */                                                                                                       \
+    ARM_UPDATE_SUM_FIR_Q31(b[0], x0, x1, x2);                                                                          \
+    x0 = vld1q_s32(px + 12);                                                                                           \
+    ARM_UPDATE_SUM_FIR_Q31(b[1], x1, x2, x0);                                                                          \
+    x1 = vld1q_s32(px + 16);                                                                                           \
+    ARM_UPDATE_SUM_FIR_Q31(b[2], x2, x0, x1);                                                                          \
+                                                                                                                       \
+    x2 = vld1q_s32(px + 20);                                                                                           \
+    ARM_UPDATE_SUM_FIR_Q31(b[3], x0, x1, x2);                                                                          \
+                                                                                                                       \
+    switch (nTail)                                                                                                     \
+    {                                                                                                                  \
+    case 0:                                                                                                            \
+        break;                                                                                                         \
+    case 1:                                                                                                            \
+        x0 = vld1q_s32(px + nTaps * 4 + 8);                                                                            \
+        b[4] = vld1q_s32(pb + (nTaps) * 4);                                                                            \
+        ARM_UPDATE_SUM_FIR_Q31_1(b[4], x1, x2)                                                                         \
+        break;                                                                                                         \
+    case 2:                                                                                                            \
+        x0 = vld1q_s32(px + (nTaps) * 4 + 8);                                                                          \
+        b[4] = vld1q_s32(pb + (nTaps) * 4);                                                                            \
+        ARM_UPDATE_SUM_FIR_Q31_2(b[4], x1, x2, x0);                                                                    \
+        break;                                                                                                         \
+    case 3:                                                                                                            \
+        x0 = vld1q_s32(px + nTaps * 4 + 8);                                                                            \
+        b[4] = vld1q_s32(pb + (nTaps) * 4);                                                                            \
+        ARM_UPDATE_SUM_FIR_Q31_3(b[4], x1, x2, x0);                                                                    \
+        break;                                                                                                         \
+    default:                                                                                                           \
+        break;                                                                                                         \
     }
 
-#define ARM_INNER_LOOP_TAPS_12_15_FIR_Q31()                                                                                      \
-    x0 = vld1q_s32(px);                                                                                                          \
-    x1 = vld1q_s32(px + 4);                                                                                                      \
-    x2 = vld1q_s32(px + 8);                                                                                                      \
-                                                                                                                                 \
-    /* acc =  b[numTaps-1] * x[n-numTaps-1] + b[numTaps-2] * x[n-numTaps-2] + b[numTaps-3] * x[n-numTaps-3] +...+ b[0] * x[0] */ \
-    ARM_UPDATE_SUM_FIR_Q31(b[0], x0, x1, x2);                                                                                    \
-    x0 = vld1q_s32(px + 12);                                                                                                     \
-    ARM_UPDATE_SUM_FIR_Q31(b[1], x1, x2, x0);                                                                                    \
-    x1 = vld1q_s32(px + 16);                                                                                                     \
-    ARM_UPDATE_SUM_FIR_Q31(b[2], x2, x0, x1);                                                                                    \
-    switch (nTail)                                                                                                               \
-    {                                                                                                                            \
-    case 0:                                                                                                                      \
-        break;                                                                                                                   \
-    case 1:                                                                                                                      \
-        x2 = vld1q_s32(px + nTaps * 4 + 8);                                                                                      \
-        b[3] = vld1q_s32(pb + (nTaps) * 4);                                                                                      \
-        ARM_UPDATE_SUM_FIR_Q31_1(b[3], x0, x1)                                                                                   \
-        break;                                                                                                                   \
-    case 2:                                                                                                                      \
-        x2 = vld1q_s32(px + (nTaps) * 4 + 8);                                                                                    \
-        b[3] = vld1q_s32(pb + (nTaps) * 4);                                                                                      \
-        ARM_UPDATE_SUM_FIR_Q31_2(b[3], x0, x1, x2);                                                                              \
-        break;                                                                                                                   \
-    case 3:                                                                                                                      \
-        x2 = vld1q_s32(px + nTaps * 4 + 8);                                                                                      \
-        b[3] = vld1q_s32(pb + (nTaps) * 4);                                                                                      \
-        ARM_UPDATE_SUM_FIR_Q31_3(b[3], x0, x1, x2);                                                                              \
-        break;                                                                                                                   \
-    default:                                                                                                                     \
-        break;                                                                                                                   \
+#define ARM_INNER_LOOP_TAPS_12_15_FIR_Q31()                                                                            \
+    x0 = vld1q_s32(px);                                                                                                \
+    x1 = vld1q_s32(px + 4);                                                                                            \
+    x2 = vld1q_s32(px + 8);                                                                                            \
+                                                                                                                       \
+    /* acc =  b[numTaps-1] * x[n-numTaps-1] + b[numTaps-2] * x[n-numTaps-2] + b[numTaps-3] * x[n-numTaps-3] +...+ b[0] \
+     * * x[0] */                                                                                                       \
+    ARM_UPDATE_SUM_FIR_Q31(b[0], x0, x1, x2);                                                                          \
+    x0 = vld1q_s32(px + 12);                                                                                           \
+    ARM_UPDATE_SUM_FIR_Q31(b[1], x1, x2, x0);                                                                          \
+    x1 = vld1q_s32(px + 16);                                                                                           \
+    ARM_UPDATE_SUM_FIR_Q31(b[2], x2, x0, x1);                                                                          \
+    switch (nTail)                                                                                                     \
+    {                                                                                                                  \
+    case 0:                                                                                                            \
+        break;                                                                                                         \
+    case 1:                                                                                                            \
+        x2 = vld1q_s32(px + nTaps * 4 + 8);                                                                            \
+        b[3] = vld1q_s32(pb + (nTaps) * 4);                                                                            \
+        ARM_UPDATE_SUM_FIR_Q31_1(b[3], x0, x1)                                                                         \
+        break;                                                                                                         \
+    case 2:                                                                                                            \
+        x2 = vld1q_s32(px + (nTaps) * 4 + 8);                                                                          \
+        b[3] = vld1q_s32(pb + (nTaps) * 4);                                                                            \
+        ARM_UPDATE_SUM_FIR_Q31_2(b[3], x0, x1, x2);                                                                    \
+        break;                                                                                                         \
+    case 3:                                                                                                            \
+        x2 = vld1q_s32(px + nTaps * 4 + 8);                                                                            \
+        b[3] = vld1q_s32(pb + (nTaps) * 4);                                                                            \
+        ARM_UPDATE_SUM_FIR_Q31_3(b[3], x0, x1, x2);                                                                    \
+        break;                                                                                                         \
+    default:                                                                                                           \
+        break;                                                                                                         \
     }
 
-#define ARM_INNER_LOOP_TAPS_8_11_FIR_Q31()                                                                                       \
-    x0 = vld1q_s32(px);                                                                                                          \
-    x1 = vld1q_s32(px + 4);                                                                                                      \
-    x2 = vld1q_s32(px + 8);                                                                                                      \
-                                                                                                                                 \
-    /* acc =  b[numTaps-1] * x[n-numTaps-1] + b[numTaps-2] * x[n-numTaps-2] + b[numTaps-3] * x[n-numTaps-3] +...+ b[0] * x[0] */ \
-    ARM_UPDATE_SUM_FIR_Q31(b[0], x0, x1, x2);                                                                                    \
-                                                                                                                                 \
-    x0 = vld1q_s32(px + 12);                                                                                                     \
-    ARM_UPDATE_SUM_FIR_Q31(b[1], x1, x2, x0);                                                                                    \
-                                                                                                                                 \
-    switch (nTail)                                                                                                               \
-    {                                                                                                                            \
-    case 0:                                                                                                                      \
-        break;                                                                                                                   \
-    case 1:                                                                                                                      \
-        x1 = vld1q_s32(px + nTaps * 4 + 8);                                                                                      \
-        b[2] = vld1q_s32(pb + (nTaps) * 4);                                                                                      \
-        ARM_UPDATE_SUM_FIR_Q31_1(b[2], x2, x0)                                                                                   \
-        break;                                                                                                                   \
-    case 2:                                                                                                                      \
-        x1 = vld1q_s32(px + (nTaps) * 4 + 8);                                                                                    \
-        b[2] = vld1q_s32(pb + (nTaps) * 4);                                                                                      \
-        ARM_UPDATE_SUM_FIR_Q31_2(b[2], x2, x0, x1);                                                                              \
-        break;                                                                                                                   \
-    case 3:                                                                                                                      \
-        x1 = vld1q_s32(px + nTaps * 4 + 8);                                                                                      \
-        b[2] = vld1q_s32(pb + (nTaps) * 4);                                                                                      \
-        ARM_UPDATE_SUM_FIR_Q31_3(b[2], x2, x0, x1);                                                                              \
-        break;                                                                                                                   \
-    default:                                                                                                                     \
-        break;                                                                                                                   \
+#define ARM_INNER_LOOP_TAPS_8_11_FIR_Q31()                                                                             \
+    x0 = vld1q_s32(px);                                                                                                \
+    x1 = vld1q_s32(px + 4);                                                                                            \
+    x2 = vld1q_s32(px + 8);                                                                                            \
+                                                                                                                       \
+    /* acc =  b[numTaps-1] * x[n-numTaps-1] + b[numTaps-2] * x[n-numTaps-2] + b[numTaps-3] * x[n-numTaps-3] +...+ b[0] \
+     * * x[0] */                                                                                                       \
+    ARM_UPDATE_SUM_FIR_Q31(b[0], x0, x1, x2);                                                                          \
+                                                                                                                       \
+    x0 = vld1q_s32(px + 12);                                                                                           \
+    ARM_UPDATE_SUM_FIR_Q31(b[1], x1, x2, x0);                                                                          \
+                                                                                                                       \
+    switch (nTail)                                                                                                     \
+    {                                                                                                                  \
+    case 0:                                                                                                            \
+        break;                                                                                                         \
+    case 1:                                                                                                            \
+        x1 = vld1q_s32(px + nTaps * 4 + 8);                                                                            \
+        b[2] = vld1q_s32(pb + (nTaps) * 4);                                                                            \
+        ARM_UPDATE_SUM_FIR_Q31_1(b[2], x2, x0)                                                                         \
+        break;                                                                                                         \
+    case 2:                                                                                                            \
+        x1 = vld1q_s32(px + (nTaps) * 4 + 8);                                                                          \
+        b[2] = vld1q_s32(pb + (nTaps) * 4);                                                                            \
+        ARM_UPDATE_SUM_FIR_Q31_2(b[2], x2, x0, x1);                                                                    \
+        break;                                                                                                         \
+    case 3:                                                                                                            \
+        x1 = vld1q_s32(px + nTaps * 4 + 8);                                                                            \
+        b[2] = vld1q_s32(pb + (nTaps) * 4);                                                                            \
+        ARM_UPDATE_SUM_FIR_Q31_3(b[2], x2, x0, x1);                                                                    \
+        break;                                                                                                         \
+    default:                                                                                                           \
+        break;                                                                                                         \
     }
 
-#define ARM_INNER_LOOP_TAPS_4_7_FIR_Q31()           \
-    x0 = vld1q_s32(px);                             \
-    x1 = vld1q_s32(px + 4);                         \
-    x2 = vld1q_s32(px + 8);                         \
-                                                    \
-    ARM_UPDATE_SUM_FIR_Q31(b[0], x0, x1, x2);       \
-                                                    \
-    switch (nTail)                                  \
-    {                                               \
-    case 0:                                         \
-        break;                                      \
-    case 1:                                         \
-        x0 = vld1q_s32(px + nTaps * 4 + 8);         \
-        b[1] = vld1q_s32(pb + (nTaps) * 4);         \
-        ARM_UPDATE_SUM_FIR_Q31_1(b[1], x1, x2)      \
-        break;                                      \
-    case 2:                                         \
-        x0 = vld1q_s32(px + (nTaps) * 4 + 8);       \
-        b[1] = vld1q_s32(pb + (nTaps) * 4);         \
-        ARM_UPDATE_SUM_FIR_Q31_2(b[1], x1, x2, x0); \
-        break;                                      \
-    case 3:                                         \
-        x0 = vld1q_s32(px + nTaps * 4 + 8);         \
-        b[1] = vld1q_s32(pb + (nTaps) * 4);         \
-        ARM_UPDATE_SUM_FIR_Q31_3(b[1], x1, x2, x0); \
-        break;                                      \
-    default:                                        \
-        break;                                      \
+#define ARM_INNER_LOOP_TAPS_4_7_FIR_Q31()                                                                              \
+    x0 = vld1q_s32(px);                                                                                                \
+    x1 = vld1q_s32(px + 4);                                                                                            \
+    x2 = vld1q_s32(px + 8);                                                                                            \
+                                                                                                                       \
+    ARM_UPDATE_SUM_FIR_Q31(b[0], x0, x1, x2);                                                                          \
+                                                                                                                       \
+    switch (nTail)                                                                                                     \
+    {                                                                                                                  \
+    case 0:                                                                                                            \
+        break;                                                                                                         \
+    case 1:                                                                                                            \
+        x0 = vld1q_s32(px + nTaps * 4 + 8);                                                                            \
+        b[1] = vld1q_s32(pb + (nTaps) * 4);                                                                            \
+        ARM_UPDATE_SUM_FIR_Q31_1(b[1], x1, x2)                                                                         \
+        break;                                                                                                         \
+    case 2:                                                                                                            \
+        x0 = vld1q_s32(px + (nTaps) * 4 + 8);                                                                          \
+        b[1] = vld1q_s32(pb + (nTaps) * 4);                                                                            \
+        ARM_UPDATE_SUM_FIR_Q31_2(b[1], x1, x2, x0);                                                                    \
+        break;                                                                                                         \
+    case 3:                                                                                                            \
+        x0 = vld1q_s32(px + nTaps * 4 + 8);                                                                            \
+        b[1] = vld1q_s32(pb + (nTaps) * 4);                                                                            \
+        ARM_UPDATE_SUM_FIR_Q31_3(b[1], x1, x2, x0);                                                                    \
+        break;                                                                                                         \
+    default:                                                                                                           \
+        break;                                                                                                         \
     }
 
-#define ARM_INNER_LOOP_GENERIC_FIR_Q31()            \
-                                                    \
-    b[0] = vld1q_s32(pb);                           \
-    x0 = vld1q_s32(px);                             \
-    x1 = vld1q_s32(px + 4);                         \
-    x2 = vld1q_s32(px + 8);                         \
-    for (int i = 0; i < nTaps; i++)                 \
-    {                                               \
-        ARM_UPDATE_SUM_FIR_Q31(b[0], x0, x1, x2);   \
-        b[0] = vld1q_s32(pb + (i + 1) * 4);         \
-        x0 = vld1q_s32(px + (i + 1) * 4);           \
-        x1 = vld1q_s32(px + (i + 1) * 4 + 4);       \
-        x2 = vld1q_s32(px + (i + 1) * 4 + 8);       \
-    }                                               \
-    switch (nTail)                                  \
-    {                                               \
-    case 0:                                         \
-        break;                                      \
-    case 1:                                         \
-        ARM_UPDATE_SUM_FIR_Q31_1(b[0], x0, x1);     \
-        break;                                      \
-    case 2:                                         \
-        ARM_UPDATE_SUM_FIR_Q31_2(b[0], x0, x1, x2); \
-        break;                                      \
-    case 3:                                         \
-        ARM_UPDATE_SUM_FIR_Q31_3(b[0], x0, x1, x2); \
-        break;                                      \
-    default:                                        \
-        break;                                      \
+#define ARM_INNER_LOOP_GENERIC_FIR_Q31()                                                                               \
+                                                                                                                       \
+    b[0] = vld1q_s32(pb);                                                                                              \
+    x0 = vld1q_s32(px);                                                                                                \
+    x1 = vld1q_s32(px + 4);                                                                                            \
+    x2 = vld1q_s32(px + 8);                                                                                            \
+    for (int i = 0; i < nTaps; i++)                                                                                    \
+    {                                                                                                                  \
+        ARM_UPDATE_SUM_FIR_Q31(b[0], x0, x1, x2);                                                                      \
+        b[0] = vld1q_s32(pb + (i + 1) * 4);                                                                            \
+        x0 = vld1q_s32(px + (i + 1) * 4);                                                                              \
+        x1 = vld1q_s32(px + (i + 1) * 4 + 4);                                                                          \
+        x2 = vld1q_s32(px + (i + 1) * 4 + 8);                                                                          \
+    }                                                                                                                  \
+    switch (nTail)                                                                                                     \
+    {                                                                                                                  \
+    case 0:                                                                                                            \
+        break;                                                                                                         \
+    case 1:                                                                                                            \
+        ARM_UPDATE_SUM_FIR_Q31_1(b[0], x0, x1);                                                                        \
+        break;                                                                                                         \
+    case 2:                                                                                                            \
+        ARM_UPDATE_SUM_FIR_Q31_2(b[0], x0, x1, x2);                                                                    \
+        break;                                                                                                         \
+    case 3:                                                                                                            \
+        ARM_UPDATE_SUM_FIR_Q31_3(b[0], x0, x1, x2);                                                                    \
+        break;                                                                                                         \
+    default:                                                                                                           \
+        break;                                                                                                         \
     }
 
-ARM_DSP_ATTRIBUTE void arm_fir_q31(const arm_fir_instance_q31 *S,
-                                   const q31_t *pSrc,
-                                   q31_t *pDst,
-                                   uint32_t blockSize)
+ARM_DSP_ATTRIBUTE void arm_fir_q31(const arm_fir_instance_q31 *S, const q31_t *pSrc, q31_t *pDst, uint32_t blockSize)
 {
     q31_t *pState = S->pState;         /* State pointer */
     const q31_t *pCoeffs = S->pCoeffs; /* Coefficient pointer */
@@ -1465,8 +1449,7 @@ ARM_DSP_ATTRIBUTE void arm_fir_q31(const arm_fir_instance_q31 *S,
     /*
      * [4 to 7 taps]
      */
-    case 1:
-    {
+    case 1: {
         pb = pCoeffs;
         int32x4_t b[2];
         b[0] = vld1q_s32(pb);
@@ -1480,8 +1463,7 @@ ARM_DSP_ATTRIBUTE void arm_fir_q31(const arm_fir_instance_q31 *S,
     /*
      * [8 to 11 taps]
      */
-    case 2:
-    {
+    case 2: {
         pb = pCoeffs;
         int32x4_t b[3];
 
@@ -1497,8 +1479,7 @@ ARM_DSP_ATTRIBUTE void arm_fir_q31(const arm_fir_instance_q31 *S,
     /*
      * [12 to 15 taps]
      */
-    case 3:
-    {
+    case 3: {
         pb = pCoeffs;
         int32x4_t b[4];
 
@@ -1514,8 +1495,7 @@ ARM_DSP_ATTRIBUTE void arm_fir_q31(const arm_fir_instance_q31 *S,
     /*
      * [16 to 19 taps]
      */
-    case 4:
-    {
+    case 4: {
         pb = pCoeffs;
         int32x4_t b[5];
 
@@ -1531,8 +1511,7 @@ ARM_DSP_ATTRIBUTE void arm_fir_q31(const arm_fir_instance_q31 *S,
     /*
      * [20 to 23 taps]
      */
-    case 5:
-    {
+    case 5: {
         pb = pCoeffs;
         int32x4_t b[6];
 
@@ -1548,8 +1527,7 @@ ARM_DSP_ATTRIBUTE void arm_fir_q31(const arm_fir_instance_q31 *S,
     /*
      * [24 to 27 taps]
      */
-    case 6:
-    {
+    case 6: {
         pb = pCoeffs;
         int32x4_t b[7];
 
@@ -1565,8 +1543,7 @@ ARM_DSP_ATTRIBUTE void arm_fir_q31(const arm_fir_instance_q31 *S,
     /*
      * [28 to 31 taps]
      */
-    case 7:
-    {
+    case 7: {
         pb = pCoeffs;
         int32x4_t b[8];
 
@@ -1582,8 +1559,7 @@ ARM_DSP_ATTRIBUTE void arm_fir_q31(const arm_fir_instance_q31 *S,
     /*
      * [32 to 35 taps]
      */
-    case 8:
-    {
+    case 8: {
         pb = pCoeffs;
         int32x4_t b[9];
 
@@ -1596,8 +1572,7 @@ ARM_DSP_ATTRIBUTE void arm_fir_q31(const arm_fir_instance_q31 *S,
         ARM_END_OF_FUNCTION_COMMON_FIR_Q31();
         return;
     }
-    default:
-    {
+    default: {
         int32x4_t b[1];
         ARM_START_OF_FUNCTION_COMMON_FIR_Q31();
         ARM_INNER_LOOP_GENERIC_FIR_Q31();
@@ -1609,11 +1584,7 @@ ARM_DSP_ATTRIBUTE void arm_fir_q31(const arm_fir_instance_q31 *S,
 
 #else
 
-ARM_DSP_ATTRIBUTE void arm_fir_q31(
-    const arm_fir_instance_q31 *S,
-    const q31_t *pSrc,
-    q31_t *pDst,
-    uint32_t blockSize)
+ARM_DSP_ATTRIBUTE void arm_fir_q31(const arm_fir_instance_q31 *S, const q31_t *pSrc, q31_t *pDst, uint32_t blockSize)
 {
     q31_t *pState = S->pState;         /* State pointer */
     const q31_t *pCoeffs = S->pCoeffs; /* Coefficient pointer */
@@ -1639,10 +1610,11 @@ ARM_DSP_ATTRIBUTE void arm_fir_q31(
     /* Loop unrolling: Compute 4 output values simultaneously.
      * The variables acc0 ... acc3 hold output values that are being computed:
      *
-     *    acc0 =  b[numTaps-1] * x[n-numTaps-1] + b[numTaps-2] * x[n-numTaps-2] + b[numTaps-3] * x[n-numTaps-3] +...+ b[0] * x[0]
-     *    acc1 =  b[numTaps-1] * x[n-numTaps]   + b[numTaps-2] * x[n-numTaps-1] + b[numTaps-3] * x[n-numTaps-2] +...+ b[0] * x[1]
-     *    acc2 =  b[numTaps-1] * x[n-numTaps+1] + b[numTaps-2] * x[n-numTaps]   + b[numTaps-3] * x[n-numTaps-1] +...+ b[0] * x[2]
-     *    acc3 =  b[numTaps-1] * x[n-numTaps+2] + b[numTaps-2] * x[n-numTaps+1] + b[numTaps-3] * x[n-numTaps]   +...+ b[0] * x[3]
+     *    acc0 =  b[numTaps-1] * x[n-numTaps-1] + b[numTaps-2] * x[n-numTaps-2] + b[numTaps-3] * x[n-numTaps-3] +...+
+     * b[0] * x[0] acc1 =  b[numTaps-1] * x[n-numTaps]   + b[numTaps-2] * x[n-numTaps-1] + b[numTaps-3] * x[n-numTaps-2]
+     * +...+ b[0] * x[1] acc2 =  b[numTaps-1] * x[n-numTaps+1] + b[numTaps-2] * x[n-numTaps]   + b[numTaps-3] *
+     * x[n-numTaps-1] +...+ b[0] * x[2] acc3 =  b[numTaps-1] * x[n-numTaps+2] + b[numTaps-2] * x[n-numTaps+1] +
+     * b[numTaps-3] * x[n-numTaps]   +...+ b[0] * x[3]
      */
 
     blkCnt = blockSize / 3;
@@ -1775,7 +1747,8 @@ ARM_DSP_ATTRIBUTE void arm_fir_q31(
         /* Perform the multiply-accumulates */
         do
         {
-            /* acc =  b[numTaps-1] * x[n-numTaps-1] + b[numTaps-2] * x[n-numTaps-2] + b[numTaps-3] * x[n-numTaps-3] +...+ b[0] * x[0] */
+            /* acc =  b[numTaps-1] * x[n-numTaps-1] + b[numTaps-2] * x[n-numTaps-2] + b[numTaps-3] * x[n-numTaps-3]
+             * +...+ b[0] * x[0] */
             acc0 += (q63_t)*px++ * *pb++;
 
             i--;
