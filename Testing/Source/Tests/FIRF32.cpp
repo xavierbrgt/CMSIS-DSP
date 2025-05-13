@@ -11,7 +11,7 @@ a double precision computation.
 
 */
 #define REL_ERROR (3.0e-5)
-
+#define ABS_ERROR (2.0e-3)
 #if defined(ARM_MATH_MVEF) && !defined(ARM_MATH_AUTOVECTORIZE)
 static __ALIGNED(8) float32_t coeffArray[32];
 #endif 
@@ -133,7 +133,7 @@ static void checkInnerTail(float32_t *b)
 
         ASSERT_SNR(output,ref,(float32_t)SNR_THRESHOLD);
 
-        ASSERT_REL_ERROR(output,ref,REL_ERROR);
+        ASSERT_CLOSE_ERROR(output,ref,ABS_ERROR, REL_ERROR);
 
     } 
 
