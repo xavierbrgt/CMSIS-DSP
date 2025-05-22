@@ -703,7 +703,7 @@ uint32_t blockSize)
    uint32_t numTaps = S->numTaps;                 /* Number of filter coefficients in the filter */
    uint32_t i, tapCnt, blkCnt;                    /* Loop counters */
 
-   float32x4_t accv0,accv1,samples0,samples1,x0,x1,x2,xa,xb,b;
+   float32x4_t accv0,accv1, accv2, accv3,samples0,samples1,x0,x1,x2,xa,xb,b;
    float32_t acc;
 
    /* S->pState points to state array which contains previous frame (numTaps - 1) samples */
@@ -731,6 +731,8 @@ uint32_t blockSize)
       /* Set the accumulators to zero */
       accv0 = vdupq_n_f32(0);
       accv1 = vdupq_n_f32(0);
+      accv2 = vdupq_n_f32(0);
+      accv3 = vdupq_n_f32(0);
 
       /* Initialize state pointer */
       px = pState;
@@ -758,8 +760,8 @@ uint32_t blockSize)
          xa = vextq_f32(x0,x1,1);
          xb = vextq_f32(x1,x2,1);
 
-         accv0 = vmlaq_n_f32(accv0,xa,vgetq_lane_f32(b, 1));
-         accv1 = vmlaq_n_f32(accv1,xb,vgetq_lane_f32(b, 1));
+         accv2 = vmlaq_n_f32(accv2,xa,vgetq_lane_f32(b, 1));
+         accv3 = vmlaq_n_f32(accv3,xb,vgetq_lane_f32(b, 1));
 
          xa = vextq_f32(x0,x1,2);
          xb = vextq_f32(x1,x2,2);
@@ -770,8 +772,8 @@ uint32_t blockSize)
          xa = vextq_f32(x0,x1,3);
          xb = vextq_f32(x1,x2,3);
 
-         accv0 = vmlaq_n_f32(accv0,xa,vgetq_lane_f32(b, 3));
-         accv1 = vmlaq_n_f32(accv1,xb,vgetq_lane_f32(b, 3));
+         accv2 = vmlaq_n_f32(accv2,xa,vgetq_lane_f32(b, 3));
+         accv3 = vmlaq_n_f32(accv3,xb,vgetq_lane_f32(b, 3));
 
          pb += 4;
          x0 = x1;
@@ -798,8 +800,8 @@ uint32_t blockSize)
            xa = vextq_f32(x0,x1,1);
            xb = vextq_f32(x1,x2,1);
 
-           accv0 = vmlaq_n_f32(accv0,xa,*pb);
-           accv1 = vmlaq_n_f32(accv1,xb,*pb);
+           accv2 = vmlaq_n_f32(accv2,xa,*pb);
+           accv3 = vmlaq_n_f32(accv3,xb,*pb);
 
            pb++;
 
@@ -821,8 +823,8 @@ uint32_t blockSize)
            xa = vextq_f32(x0,x1,1);
            xb = vextq_f32(x1,x2,1);
 
-           accv0 = vmlaq_n_f32(accv0,xa,*pb);
-           accv1 = vmlaq_n_f32(accv1,xb,*pb);
+           accv2 = vmlaq_n_f32(accv2,xa,*pb);
+           accv3 = vmlaq_n_f32(accv3,xb,*pb);
 
          }
          break;
@@ -839,6 +841,8 @@ uint32_t blockSize)
       }
 
       /* The result is stored in the destination buffer. */
+      accv0 = vaddq_f32(accv0, accv2);
+      accv1 = vaddq_f32(accv1, accv3);
       vst1q_f32(pDst,accv0);
       pDst += 4;
       vst1q_f32(pDst,accv1);
