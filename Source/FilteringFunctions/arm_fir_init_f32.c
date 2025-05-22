@@ -87,7 +87,7 @@ ARM_DSP_ATTRIBUTE void arm_fir_init_f32(
 #if defined(ARM_MATH_MVEF) && !defined(ARM_MATH_AUTOVECTORIZE)
   memset(pState, 0, (numTaps + (blockSize - 1U) + blockSize) * sizeof(float32_t));
 #else
-  memset(pState, 0, (numTaps + (blockSize - 1U)) * sizeof(float32_t));
+  memset(pState, 0, (numTaps + (blockSize - 1U) + blockSize) * sizeof(float32_t));
 #endif
   /* Assign state pointer */
   S->pState = pState;

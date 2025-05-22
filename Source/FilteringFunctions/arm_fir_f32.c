@@ -27,7 +27,7 @@
  */
 
 #include "dsp/filtering_functions.h"
-
+#include <stdio.h>
 /**
   @ingroup groupFilters
  */
@@ -695,6 +695,8 @@ static void arm_update_fir_f32_1(float32x4_t *accv0, float32x4_t *accv1, float32
     float32x4_t xb = x1;
     *accv0 = vfmaq_n_f32(*accv0, xa, vgetq_lane_f32(b, 0));
     *accv1 = vfmaq_n_f32(*accv1, xb, vgetq_lane_f32(b, 0));
+    //printf("cpmpute b %f %f\n", xb[0], b[0]);
+
 }
 static void arm_update_fir_f32_2(float32x4_t *accv0, float32x4_t *accv1, float32x4_t *accv2, float32x4_t *accv3,
                                  float32x4_t x0, float32x4_t x1, float32x4_t x2, float32x4_t b)
@@ -717,21 +719,21 @@ static void arm_update_fir_f32_3(float32x4_t *accv0, float32x4_t *accv1, float32
     float32x4_t xb = x1;
     *accv0 = vfmaq_n_f32(*accv0, xa, vgetq_lane_f32(b, 0));
     *accv1 = vfmaq_n_f32(*accv1, xb, vgetq_lane_f32(b, 0));
-
+    //printf("cpmpute b %f %f\n", xb[3], b[0]);
     xa = vextq_f32(x0, x1, 1);
     xb = vextq_f32(x1, x2, 1);
 
     *accv2 = vfmaq_n_f32(*accv2, xa, vgetq_lane_f32(b, 1));
     *accv3 = vfmaq_n_f32(*accv3, xb, vgetq_lane_f32(b, 1));
-
+    //printf("Compute b %f %f\n", xb[3], b[1]);
     xa = vextq_f32(x0, x1, 2);
     xb = vextq_f32(x1, x2, 2);
-
+    //printf("COmpute b %f %f\n", xb[3], b[2]);
     *accv0 = vfmaq_n_f32(*accv0, xa, vgetq_lane_f32(b, 2));
     *accv1 = vfmaq_n_f32(*accv1, xb, vgetq_lane_f32(b, 2));
 }
 
-#define ARM_START_OF_FUNCTION_COMMON_FIR_F32()                                                                         \
+#define ARM_START_OF_FUNCTION_COMMON_FIR_F32(pState2)                                                                         \
     /* S->pState points to state array which contains previous frame (numTaps - 1) samples */                          \
     /* pStateCurnt points to the location where the new input data should be written */                                \
     pStateCurnt = &(S->pState[(numTaps - 1U)]);                                                                        \
@@ -740,6 +742,7 @@ static void arm_update_fir_f32_3(float32x4_t *accv0, float32x4_t *accv1, float32
     blkCnt = blockSize >> 3;                                                                                           \
     /* Initialize coefficient pointer */                                                                               \
     int nTaps = S->numTaps >> 2;                                                                                       \
+    px = pState2;\
     while ((blkCnt > 0U))                                                                                              \
     {                                                                                                                  \
         /* Copy 8 samples at a time into state buffers */                                                              \
@@ -761,8 +764,27 @@ static void arm_update_fir_f32_3(float32x4_t *accv0, float32x4_t *accv1, float32
         accv2 = vdupq_n_f32(0);                                                                                        \
         accv3 = vdupq_n_f32(0);                                                                                        \
                                                                                                                        \
-        /* Initialize state pointer */                                                                                 \
-        px = pState;
+        /* Initialize state pointer */                                                                                 
+        
+#define ARM_START_OF_FUNCTION_COMMON_FIR_F32_LOOP(pState2)                                                                         \
+    /* S->pState points to state array which contains previous frame (numTaps - 1) samples */                          \
+    /* pStateCurnt points to the location where the new input data should be written */                                \
+    /*pStateCurnt = &(S->pState[(numTaps - 1U)]);*/                                                                        \
+                                                                                                                       \
+    /* Loop unrolling */                                                                                               \
+    blkCnt = blockSize >> 3;                                                                                          \
+    /* Initialize coefficient pointer */                                                                               \
+    px = pState2;\
+    while ((blkCnt > 0U))                                                                                              \
+    {                                                                                                                  \
+        pb = pCoeffs;                                                                                                  \
+        /* Set the accumulators to zero */                                                                             \
+        accv0 = vdupq_n_f32(0);                                                                                        \
+        accv1 = vdupq_n_f32(0);                                                                                        \
+        accv2 = vdupq_n_f32(0);                                                                                        \
+        accv3 = vdupq_n_f32(0);                                                                                        \
+                                                                                                                       \
+        /* Initialize state pointer */                                                                                 
 
 #define ARM_END_OF_FUNCTION_COMMON_FIR_F32()                                                                           \
     accv0 = vaddq_f32(accv0, accv2);                                                                                   \
@@ -774,7 +796,7 @@ static void arm_update_fir_f32_3(float32x4_t *accv0, float32x4_t *accv1, float32
     pDst += 4;                                                                                                         \
     /* Advance state pointer by 8 for the next 8 samples */                                                            \
     pState = pState + 8;                                                                                               \
-                                                                                                                       \
+    px +=8;                                                                                                            \
     blkCnt--;                                                                                                          \
     }                                                                                                                  \
                                                                                                                        \
@@ -820,6 +842,90 @@ static void arm_update_fir_f32_3(float32x4_t *accv0, float32x4_t *accv1, float32
                                                                                                                        \
     /* Points to the start of the state buffer */                                                                      \
     pStateCurnt = S->pState;                                                                                           \
+                                                                                                                       \
+    /* Copy numTaps number of values */                                                                                \
+    tapCnt = numTaps - 1U;                                                                                             \
+                                                                                                                       \
+    /* Copy data */                                                                                                    \
+    while (tapCnt > 0U)                                                                                                \
+    {                                                                                                                  \
+        *pStateCurnt++ = *pState++;                                                                                    \
+                                                                                                                       \
+        /* Decrement the loop counter */                                                                               \
+        tapCnt--;                                                                                                      \
+    }
+
+#define ARM_END_OF_FUNCTION_COMMON_FIR_F32_LOOP()                                                                           \
+    /*end of inner loop 32*/\
+            /*ARM_END_OF_FUNCTION_COMMON_FIR_F32();*/\
+            accv0 = vaddq_f32(accv0, accv2);\
+            /*printf("accv0 %f %f %f %f\n", accv0[0], accv0[1], accv0[2], accv0[3]);*/                                                                                  \
+            accv1 = vaddq_f32(accv1, accv3);\
+            /*printf("accv1 %f %f %f %f\n", accv1[0], accv1[1], accv1[2], accv1[3]);*/                                                                                  \
+            /* The result is stored in the destination buffer. */\
+            x1 = vld1q_f32(pState);                                                             \
+            /*printf("accv0 preproc %f %f %f %f\n", x1[0], x1[1], x1[2], x1[3]);*/                                                                                  \
+            vst1q_f32(pDst, vaddq_f32(accv0, x1));\
+            pState+=4;                                                                                           \
+            pDst += 4;\
+            x2 = vld1q_f32(pState);                                                                                                \
+            /*printf("accv1 preproc %f %f %f %f\n", x2[0], x2[1], x2[2], x2[3]);*/                                                                                  \
+            vst1q_f32(pDst, vaddq_f32(accv1, x2));                                                                                           \
+            pDst += 4;\
+            pState+=4;  \
+            px+=8;                                                                                                     \
+            /* Advance state pointer by 8 for the next 8 samples */                                                           \
+            /*pState = pState + 8;*/                                                                                              \
+                                                                                                                            \
+            blkCnt--;                                                                                                         \
+        }\
+    /* Tail */                                                                                                         \
+    blkCnt = blockSize & 0x7;                                                                                          \
+    pStateacc = S->pState + 2*blockSize -blkCnt;\
+    while (blkCnt > 0U)                                                                                                \
+    {                                                                                                                  \
+        /* Copy one sample at a time into state buffer */                                                              \
+        /*printf("in %f suppose 7.374\n", pSrc);*/\
+        *pStateCurnt++ = *pSrc++;                                                                                      \
+                                                                                                                       \
+        /* Set the accumulator to zero */                                                                              \
+        acc = 0.0f;                                                                                                    \
+                                                                                                                       \
+        /* Initialize state pointer */                                                                                 \
+        px = pStateacc;                                                                                                   \
+                                                                                                                       \
+        /* Initialize Coefficient pointer */                                                                           \
+        pb = pCoeffs;                                                                                                  \
+                                                                                                                       \
+        i = numTaps;                                                                                                   \
+                                                                                                                       \
+        /* Perform the multiply-accumulates */                                                                         \
+        do                                                                                                             \
+        {                                                                                                              \
+            /* acc =  b[numTaps-1] * x[n-numTaps-1] + b[numTaps-2] * x[n-numTaps-2] + b[numTaps-3] * x[n-numTaps-3]    \
+             * +...+ b[0] * x[0] */                                                                                    \
+            /*printf("px %f pb %f ", px[0], pb[0]);*/\
+            acc += *px++ * *pb++;                                                                                      \
+            /*printf("acc %f\n", acc);*/\
+            i--;                                                                                                       \
+                                                                                                                       \
+        } while (i > 0U);                                                                                              \
+                                                                                                                       \
+        /* The result is stored in the destination buffer. */                                                          \
+        *pDst++ = acc;                                                                                                 \
+        /* Advance state pointer by 1 for the next sample */                                                           \
+        pStateacc = pStateacc + 1;                                                                                           \
+                                                                                                                       \
+        blkCnt--;                                                                                                      \
+    }                                                                                                                  \
+                                                                                                                       \
+    /* Processing is complete.                                                                                         \
+    ** Now copy the last numTaps - 1 samples to the starting of the state buffer.                                      \
+    ** This prepares the state buffer for the next function call. */                                                   \
+                                                                                                                       \
+    /* Points to the start of the state buffer */                                                                      \
+    pStateCurnt = S->pState + blockSize;                                                                                           \
+    pState = S->pState + 2*blockSize;\
                                                                                                                        \
     /* Copy numTaps number of values */                                                                                \
     tapCnt = numTaps - 1U;                                                                                             \
@@ -1137,15 +1243,26 @@ static void arm_update_fir_f32(float32x4_t *accv0, float32x4_t *accv1, float32x4
     x0 = vld1q_f32(px);                                                                                                \
     x1 = vld1q_f32(px + 4);                                                                                            \
     x2 = vld1q_f32(px + 8);                                                                                            \
+    /*printf("partial sum b %f %f %f %f\n", accv1[0] + accv3[0], accv1[1] + accv3[1], accv1[2] + accv3[2], accv1[3]+ accv3[3]);*/\
     arm_update_fir_f32(&accv0, &accv1, &accv2, &accv3, x0, x1, x2, b[0]);                                              \
-                                                                                                                       \
+    /*printf("COEFS b %f %f %f %f\n", b[0][0], b[0][1], b[0][2], b[0][3]);*/                                                                                                                   \
+    /*printf("partial sum a %f %f %f %f\n", accv0[0] + accv2[0], accv0[1] + accv2[1], accv0[2] + accv2[2], accv0[3]+ accv2[3]);*/\
+    /*printf("partial sum b %f %f %f %f\n", accv1[0] + accv3[0], accv1[1] + accv3[1], accv1[2] + accv3[2], accv1[3]+ accv3[3]);*/\
+    /*printf("nTaps %d, nTail %d\n", nTaps, nTail);*/\
     switch (nTail)                                                                                                     \
     {                                                                                                                  \
     case 0:                                                                                                            \
         break;                                                                                                         \
     case 1:                                                                                                            \
         x0 = vld1q_f32(px + nTaps * 4 + 8);                                                                            \
+        /*printf("x1 %f %f %f %f\n", x1[0], x1[1], x1[2], x1[3]);*/\
+        /*printf("x2 %f %f %f %f\n", x2[0], x2[1], x2[2], x2[3]);*/\
+        /*printf("x0 %f %f %f %f\n", x0[0], x0[1], x0[2], x0[3]);*/\
         arm_update_fir_f32_1(&accv0, &accv1, x1, x2, b[1]);                                                            \
+        /*printf("COEFS b %f %f %f %f\n", b[1][0], b[1][1], b[1][2], b[1][3]);*/                                                                                                                   \
+    /*printf("partial sum a %f %f %f %f\n", accv0[0] + accv2[0], accv0[1] + accv2[1], accv0[2] + accv2[2], accv0[3]+ accv2[3]);*/\
+    /*printf("partial sum b %f %f %f %f\n", accv1[0] + accv3[0], accv1[1] + accv3[1], accv1[2] + accv3[2], accv1[3]+ accv3[3]);*/\
+    /*printf("partial sum b11 %f %f %f %f\n", accv1[0] , accv1[1],  accv1[2],  accv1[3]);*/\
         break;                                                                                                         \
     case 2:                                                                                                            \
         x0 = vld1q_f32(px + (nTaps) * 4 + 8);                                                                          \
@@ -1196,6 +1313,7 @@ ARM_DSP_ATTRIBUTE void arm_fir_f32(const arm_fir_instance_f32 *S, const float32_
                                    uint32_t blockSize)
 {
     float32_t *pState = S->pState;         /* State pointer */
+    float32_t *pStateacc = S->pState + blockSize;
     const float32_t *pCoeffs = S->pCoeffs; /* Coefficient pointer */
     float32_t *pStateCurnt;                /* Points to the current sample of the state */
     float32_t *px;                         /* Temporary pointers for state buffer */
@@ -1211,118 +1329,378 @@ ARM_DSP_ATTRIBUTE void arm_fir_f32(const arm_fir_instance_f32 *S, const float32_
     int nTail = S->numTaps & 3;
     /* Specialized routine for small number of taps
         trying to prevent reload and to add enough delay between the reuse of the vectors */
-    switch (nbTaps)
+    if(numTaps > 35)
     {
-    case 1: {
-        pb = pCoeffs;
-        float32x4_t b[2];
-        b[0] = vld1q_f32(pb);
-        if (nTail > 0)
-            b[1] = vld1q_f32(pb + 4);
-        ARM_START_OF_FUNCTION_COMMON_FIR_F32();
-        ARM_INNER_LOOP_COEF_4_7_FIR_F32();
-        ARM_END_OF_FUNCTION_COMMON_FIR_F32();
-        return;
-    }
-    case 2: {
-        pb = pCoeffs;
-        float32x4_t b[3];
+        nbTaps = (numTaps&31) >> 2;
+        int REMAINING_BLOCK_TAPS_TO_PROCESS = numTaps;
+        int blocksdone =0;
 
-        for (int i = 0; i < nbTaps; i++)
-            b[i] = vld1q_f32(pb + i * 4);
-        if (nTail > 0)
-            b[2] = vld1q_f32(pb + nbTaps * 4);
-        ARM_START_OF_FUNCTION_COMMON_FIR_F32();
-        ARM_INNER_LOOP_COEF_8_11_FIR_F32();
-        ARM_END_OF_FUNCTION_COMMON_FIR_F32();
-        return;
-    }
-    case 3: {
-        pb = pCoeffs;
-        float32x4_t b[4];
-
-        for (int i = 0; i < nbTaps; i++)
-            b[i] = vld1q_f32(pb + i * 4);
-        if (nTail > 0)
-            b[3] = vld1q_f32(pb + nbTaps * 4);
-        ARM_START_OF_FUNCTION_COMMON_FIR_F32();
-        ARM_INNER_LOOP_COEF_12_15_FIR_F32();
-        ARM_END_OF_FUNCTION_COMMON_FIR_F32();
-        return;
-    }
-    case 4: {
-        pb = pCoeffs;
-        float32x4_t b[5];
-
-        for (int i = 0; i < nbTaps; i++)
-            b[i] = vld1q_f32(pb + i * 4);
-        if (nTail > 0)
-            b[4] = vld1q_f32(pb + nbTaps * 4);
-        ARM_START_OF_FUNCTION_COMMON_FIR_F32();
-        ARM_INNER_LOOP_COEF_16_19_FIR_F32();
-        ARM_END_OF_FUNCTION_COMMON_FIR_F32();
-        return;
-    }
-    case 5: {
-        pb = pCoeffs;
-        float32x4_t b[6];
-
-        for (int i = 0; i < nbTaps; i++)
-            b[i] = vld1q_f32(pb + i * 4);
-        if (nTail > 0)
-            b[5] = vld1q_f32(pb + nbTaps * 4);
-        ARM_START_OF_FUNCTION_COMMON_FIR_F32();
-        ARM_INNER_LOOP_COEF_20_23_FIR_F32();
-        ARM_END_OF_FUNCTION_COMMON_FIR_F32();
-        return;
-    }
-    case 6: {
-        pb = pCoeffs;
-        float32x4_t b[7];
-
-        for (int i = 0; i < nbTaps; i++)
-            b[i] = vld1q_f32(pb + i * 4);
-        if (nTail > 0)
-            b[6] = vld1q_f32(pb + nbTaps * 4);
-        ARM_START_OF_FUNCTION_COMMON_FIR_F32();
-        ARM_INNER_LOOP_COEF_24_27_FIR_F32();
-        ARM_END_OF_FUNCTION_COMMON_FIR_F32();
-        return;
-    }
-    case 7: {
-        pb = pCoeffs;
-        float32x4_t b[8];
-
-        for (int i = 0; i < nbTaps; i++)
-            b[i] = vld1q_f32(pb + i * 4);
-        if (nTail > 0)
-            b[7] = vld1q_f32(pb + nbTaps * 4);
-        ARM_START_OF_FUNCTION_COMMON_FIR_F32();
-        ARM_INNER_LOOP_COEF_28_31_FIR_F32();
-        ARM_END_OF_FUNCTION_COMMON_FIR_F32();
-        return;
-    }
-    case 8: {
         pb = pCoeffs;
         float32x4_t b[9];
-
-        for (int i = 0; i < nbTaps; i++)
+        for (int i = 0; i < 8; i++)
             b[i] = vld1q_f32(pb + i * 4);
-        if (nTail > 0)
-            b[8] = vld1q_f32(pb + nbTaps * 4);
+        blocksdone += 8;
+        
+        /* S->pState points to state array which contains previous frame (numTaps - 1) samples */                          
+        /* pStateCurnt points to the location where the new input data should be written */                                
+        pStateCurnt = &(pStateacc[(numTaps - 1U)]);                                                                        
+        /* Initialize state pointer */                                                                                 
+            px = pStateacc;                                                                                                                
+        /* Loop unrolling */                                                                                               
+        blkCnt = blockSize >> 3;                                                                                           
+        /* Initialize coefficient pointer */                                                                                                                                                                  
+        while ((blkCnt > 0U))                                                                                              
+        {                                                                                                                  
+            /* Copy 8 samples at a time into state buffers */                                                              
+            samples0 = vld1q_f32(pSrc);                                                                                    
+            vst1q_f32(pStateCurnt, samples0);                                                                              
+                                                                                                                        
+            pStateCurnt += 4;                                                                                              
+            pSrc += 4;                                                                                                     
+                                                                                                                        
+            samples1 = vld1q_f32(pSrc);                                                                                    
+            vst1q_f32(pStateCurnt, samples1);                                                                              
+                                                                                                                        
+            pStateCurnt += 4;                                                                                              
+            pSrc += 4;                                                                                                     
+            pb = pCoeffs;                                                                                                  
+            /* Set the accumulators to zero */                                                                             
+            accv0 = vdupq_n_f32(0);                                                                                        
+            accv1 = vdupq_n_f32(0);                                                                                        
+            accv2 = vdupq_n_f32(0);                                                                                        
+            accv3 = vdupq_n_f32(0);                                                                                        
+                                                                                                                        
+            x0 = vld1q_f32(px);                                                                                                
+            x1 = vld1q_f32(px + 4);                                                                                            
+            x2 = vld1q_f32(px + 8);                                                                                            
 
-        ARM_START_OF_FUNCTION_COMMON_FIR_F32();
-        ARM_INNER_LOOP_COEF_32_35_FIR_F32();
-        ARM_END_OF_FUNCTION_COMMON_FIR_F32();
-        return;
+            arm_update_fir_f32(&accv0, &accv1, &accv2, &accv3, x0, x1, x2, b[0]);                                              
+
+            x0 = vld1q_f32(px + 12);                                                                                           
+            arm_update_fir_f32(&accv0, &accv1, &accv2, &accv3, x1, x2, x0, b[1]);                                              
+
+            x1 = vld1q_f32(px + 16);                                                                                           
+            arm_update_fir_f32(&accv0, &accv1, &accv2, &accv3, x2, x0, x1, b[2]);                                              
+
+            x2 = vld1q_f32(px + 20);                                                                                           
+            arm_update_fir_f32(&accv0, &accv1, &accv2, &accv3, x0, x1, x2, b[3]);                                              
+
+            x0 = vld1q_f32(px + 24);                                                                                           
+            arm_update_fir_f32(&accv0, &accv1, &accv2, &accv3, x1, x2, x0, b[4]);                                              
+
+            x1 = vld1q_f32(px + 28);                                                                                           
+            arm_update_fir_f32(&accv0, &accv1, &accv2, &accv3, x2, x0, x1, b[5]);                                              
+
+            x2 = vld1q_f32(px + 32);                                                                                           
+            arm_update_fir_f32(&accv0, &accv1, &accv2, &accv3, x0, x1, x2, b[6]);                                              
+
+            x0 = vld1q_f32(px + 36);                                                                                           
+            arm_update_fir_f32(&accv0, &accv1, &accv2, &accv3, x1, x2, x0, b[7]);                                              
+                                                                                                                        
+            accv0 = vaddq_f32(accv0, accv2);
+            accv1 = vaddq_f32(accv1, accv3);                            
+
+            /* The result is stored in the destination buffer. */                                                             
+            vst1q_f32(pState, accv0);
+            pState += 4;                                                                                                        
+            vst1q_f32(pState, accv1);                                                                                           
+            pState += 4;  
+            /* Advance state pointer by 8 for the next 8 samples */                                                           
+            px += 8;
+            blkCnt--;   
+        }
+        REMAINING_BLOCK_TAPS_TO_PROCESS -= 32;
+        while(REMAINING_BLOCK_TAPS_TO_PROCESS >35)
+        {
+            for (int i = 0; i < 8; i++)
+            b[i] = vld1q_f32(pb + i * 4 + blocksdone*4);
+
+            /* S->pState points to state array which contains previous frame (numTaps - 1) samples */                          
+            /* pStateCurnt points to the location where the new input data should be written */                                
+            pState = S->pState;                                                                                                                
+            /* Initialize state pointer */                                                                                 
+            px = pStateacc + (32*(blocksdone>>3));
+            /* Loop unrolling */                                                                                               
+            blocksdone += 8;
+            blkCnt = blockSize >> 3;
+            while ((blkCnt > 0U))                                                                                              
+            {                                                                                                                                                                                                                       
+                /* Set the accumulators to zero */                                                                             
+                accv0 = vdupq_n_f32(0);                                                                                        
+                accv1 = vdupq_n_f32(0);                                                                                        
+                accv2 = vdupq_n_f32(0);                                                                                        
+                accv3 = vdupq_n_f32(0);                                                                                        
+                                                                                                                            
+                x0 = vld1q_f32(px);                                                                                                
+                x1 = vld1q_f32(px + 4);                                                                                        
+                x2 = vld1q_f32(px + 8);                                                                                        
+
+                arm_update_fir_f32(&accv0, &accv1, &accv2, &accv3, x0, x1, x2, b[0]);                                          
+
+                x0 = vld1q_f32(px + 12);                                                                                       
+                arm_update_fir_f32(&accv0, &accv1, &accv2, &accv3, x1, x2, x0, b[1]);                                          
+
+                x1 = vld1q_f32(px + 16);                                                                                       
+                arm_update_fir_f32(&accv0, &accv1, &accv2, &accv3, x2, x0, x1, b[2]);                                          
+
+                x2 = vld1q_f32(px + 20);                                                                                       
+                arm_update_fir_f32(&accv0, &accv1, &accv2, &accv3, x0, x1, x2, b[3]);                                          
+
+                x0 = vld1q_f32(px + 24);                                                                                       
+                arm_update_fir_f32(&accv0, &accv1, &accv2, &accv3, x1, x2, x0, b[4]);                                          
+
+                x1 = vld1q_f32(px + 28);                                                                                       
+                arm_update_fir_f32(&accv0, &accv1, &accv2, &accv3, x2, x0, x1, b[5]);                                          
+
+                x2 = vld1q_f32(px + 32);                                                                                       
+                arm_update_fir_f32(&accv0, &accv1, &accv2, &accv3, x0, x1, x2, b[6]);                                          
+
+                x0 = vld1q_f32(px + 36);                                                                                       
+                arm_update_fir_f32(&accv0, &accv1, &accv2, &accv3, x1, x2, x0, b[7]);                                          
+
+                accv0 = vaddq_f32(accv0, accv2);
+                accv1 = vaddq_f32(accv1, accv3);
+                /* The result is stored in the destination buffer. */
+                x1 = vld1q_f32(pState);                                                             
+                vst1q_f32(pState, vaddq_f32(accv0, x1));
+                pState+=4;                                                                                           
+                x2 = vld1q_f32(pState);                                                                                                
+                vst1q_f32(pState, vaddq_f32(accv1, x2));                                                                                           
+                pState+=4; 
+
+                /* Advance state pointer by 8 for the next 8 samples */
+                px += 8;
+                blkCnt--;
+            }
+            REMAINING_BLOCK_TAPS_TO_PROCESS -=32;
+        }
+        if(REMAINING_BLOCK_TAPS_TO_PROCESS <= 35)
+        {
+            switch (nbTaps)
+            {
+            case 1: 
+            {
+                int nTaps = REMAINING_BLOCK_TAPS_TO_PROCESS >> 2;
+                b[0] = vld1q_f32(pb + blocksdone*4);
+                if (nTail > 0)
+                    b[1] = vld1q_f32(pb + blocksdone*4 +4);
+                pState = S->pState;
+                ARM_START_OF_FUNCTION_COMMON_FIR_F32_LOOP(pStateacc + (32*(blocksdone>>3)));
+                ARM_INNER_LOOP_COEF_4_7_FIR_F32();
+                ARM_END_OF_FUNCTION_COMMON_FIR_F32_LOOP();
+                return;
+            }
+            case 2: 
+            {
+                pState = S->pState;
+                int nTaps = REMAINING_BLOCK_TAPS_TO_PROCESS >> 2;
+                for (int i = 0; i < 2; i++)
+                    b[i] = vld1q_f32(pb + blocksdone*4 + i * 4);
+                if (nTail > 0)
+                    b[2] = vld1q_f32(pb + blocksdone*4 + 8);
+                ARM_START_OF_FUNCTION_COMMON_FIR_F32_LOOP(pStateacc + (32*(blocksdone>>3)));
+                ARM_INNER_LOOP_COEF_8_11_FIR_F32();
+                ARM_END_OF_FUNCTION_COMMON_FIR_F32_LOOP();
+                return;
+            }
+            case 3: 
+            {
+                pState = S->pState;
+                int nTaps = REMAINING_BLOCK_TAPS_TO_PROCESS >> 2;
+
+                for (int i = 0; i < 3; i++)
+                    b[i] = vld1q_f32(pb + blocksdone*4 + i * 4);
+                if (nTail > 0)
+                    b[3] = vld1q_f32(pb + blocksdone*4 + 4*3);
+                ARM_START_OF_FUNCTION_COMMON_FIR_F32_LOOP(pStateacc + (32*(blocksdone>>3)));
+                ARM_INNER_LOOP_COEF_12_15_FIR_F32();
+                ARM_END_OF_FUNCTION_COMMON_FIR_F32_LOOP();
+                return;
+            }
+            case 4: 
+            {
+                pState = S->pState;
+                int nTaps = REMAINING_BLOCK_TAPS_TO_PROCESS >> 2;
+                for (int i = 0; i < 4; i++)
+                    b[i] = vld1q_f32(pb +  blocksdone*4 + i * 4);
+                if (nTail > 0)
+                    b[4] = vld1q_f32(pb + blocksdone*4 + 4 * 4);
+                ARM_START_OF_FUNCTION_COMMON_FIR_F32_LOOP(pStateacc + (32*(blocksdone>>3)));
+                ARM_INNER_LOOP_COEF_16_19_FIR_F32();
+                ARM_END_OF_FUNCTION_COMMON_FIR_F32_LOOP();
+                return;
+            }
+            case 5: 
+            {
+                pState = S->pState;
+                int nTaps = REMAINING_BLOCK_TAPS_TO_PROCESS >> 2;
+
+                for (int i = 0; i < 5; i++)
+                    b[i] = vld1q_f32(pb + blocksdone*4 + i * 4);
+                if (nTail > 0)
+                    b[5] = vld1q_f32(pb + blocksdone*4 +5 * 4);
+                ARM_START_OF_FUNCTION_COMMON_FIR_F32_LOOP(pStateacc + (32*(blocksdone>>3)));
+                ARM_INNER_LOOP_COEF_20_23_FIR_F32();
+                ARM_END_OF_FUNCTION_COMMON_FIR_F32_LOOP();
+                return;
+            }
+            case 6: {
+                pState = S->pState;
+                int nTaps = REMAINING_BLOCK_TAPS_TO_PROCESS >> 2;
+
+                for (int i = 0; i < 6; i++)
+                    b[i] = vld1q_f32(pb + blocksdone*4 + i * 4);
+                if (nTail > 0)
+                    b[6] = vld1q_f32(pb + blocksdone*4 + 6 * 4);
+                ARM_START_OF_FUNCTION_COMMON_FIR_F32_LOOP(pStateacc + (32*(blocksdone>>3)));
+                ARM_INNER_LOOP_COEF_24_27_FIR_F32();
+                ARM_END_OF_FUNCTION_COMMON_FIR_F32_LOOP();
+                return;
+            }
+            case 7: {
+                pState = S->pState;
+                int nTaps = REMAINING_BLOCK_TAPS_TO_PROCESS >> 2;
+
+                for (int i = 0; i < 7; i++)
+                    b[i] = vld1q_f32(pb + blocksdone*4 + i * 4);
+                if (nTail > 0)
+                    b[7] = vld1q_f32(pb + blocksdone*4 + 7 * 4);
+                ARM_START_OF_FUNCTION_COMMON_FIR_F32_LOOP(pStateacc + (32*(blocksdone>>3)));
+                ARM_INNER_LOOP_COEF_28_31_FIR_F32();
+                ARM_END_OF_FUNCTION_COMMON_FIR_F32_LOOP();
+                return;
+            }
+            default: 
+            {
+                int nTaps = REMAINING_BLOCK_TAPS_TO_PROCESS >> 2; 
+                for (int i = 0; i < 8; i++)
+                    b[i] = vld1q_f32(pb + i * 4 + blocksdone*4);
+                if (nTail > 0)
+                    b[8] = vld1q_f32(pb + blocksdone*4+8*4);
+                pState = S->pState;
+                ARM_START_OF_FUNCTION_COMMON_FIR_F32_LOOP(pStateacc + (32*(blocksdone>>3)));
+                ARM_INNER_LOOP_COEF_32_35_FIR_F32();
+                ARM_END_OF_FUNCTION_COMMON_FIR_F32_LOOP();
+                return;
+            }
+            }
+        }
     }
-    default: {
-        float32x4_t b[1];
-        ARM_START_OF_FUNCTION_COMMON_FIR_F32();
-        ARM_INNER_LOOP_GENERIC_FIR_F32();
-        ARM_END_OF_FUNCTION_COMMON_FIR_F32();
-        return;
-    }
+    else
+    {
+        switch (nbTaps)
+        {
+        case 1: {
+            pb = pCoeffs;
+            float32x4_t b[2];
+            b[0] = vld1q_f32(pb);
+            if (nTail > 0)
+                b[1] = vld1q_f32(pb + 4);
+            ARM_START_OF_FUNCTION_COMMON_FIR_F32(pState);
+            ARM_INNER_LOOP_COEF_4_7_FIR_F32();
+            ARM_END_OF_FUNCTION_COMMON_FIR_F32();
+            return;
+        }
+        case 2: {
+            pb = pCoeffs;
+            float32x4_t b[3];
+
+            for (int i = 0; i < nbTaps; i++)
+                b[i] = vld1q_f32(pb + i * 4);
+            if (nTail > 0)
+                b[2] = vld1q_f32(pb + nbTaps * 4);
+            ARM_START_OF_FUNCTION_COMMON_FIR_F32(pState);
+            ARM_INNER_LOOP_COEF_8_11_FIR_F32();
+            ARM_END_OF_FUNCTION_COMMON_FIR_F32();
+            return;
+        }
+        case 3: {
+            pb = pCoeffs;
+            float32x4_t b[4];
+
+            for (int i = 0; i < nbTaps; i++)
+                b[i] = vld1q_f32(pb + i * 4);
+            if (nTail > 0)
+                b[3] = vld1q_f32(pb + nbTaps * 4);
+            ARM_START_OF_FUNCTION_COMMON_FIR_F32(pState);
+            ARM_INNER_LOOP_COEF_12_15_FIR_F32();
+            ARM_END_OF_FUNCTION_COMMON_FIR_F32();
+            return;
+        }
+        case 4: {
+            pb = pCoeffs;
+            float32x4_t b[5];
+            for (int i = 0; i < nbTaps; i++)
+                b[i] = vld1q_f32(pb + i * 4);
+            if (nTail > 0)
+                b[4] = vld1q_f32(pb + nbTaps * 4);
+            ARM_START_OF_FUNCTION_COMMON_FIR_F32(pState);
+            ARM_INNER_LOOP_COEF_16_19_FIR_F32();
+            ARM_END_OF_FUNCTION_COMMON_FIR_F32();
+            return;
+        }
+        case 5: {
+            pb = pCoeffs;
+            float32x4_t b[6];
+
+            for (int i = 0; i < nbTaps; i++)
+                b[i] = vld1q_f32(pb + i * 4);
+            if (nTail > 0)
+                b[5] = vld1q_f32(pb + nbTaps * 4);
+            ARM_START_OF_FUNCTION_COMMON_FIR_F32(pState);
+            ARM_INNER_LOOP_COEF_20_23_FIR_F32();
+            ARM_END_OF_FUNCTION_COMMON_FIR_F32();
+            return;
+        }
+        case 6: {
+            pb = pCoeffs;
+            float32x4_t b[7];
+
+            for (int i = 0; i < nbTaps; i++)
+                b[i] = vld1q_f32(pb + i * 4);
+            if (nTail > 0)
+                b[6] = vld1q_f32(pb + nbTaps * 4);
+            ARM_START_OF_FUNCTION_COMMON_FIR_F32(pState);
+            ARM_INNER_LOOP_COEF_24_27_FIR_F32();
+            ARM_END_OF_FUNCTION_COMMON_FIR_F32();
+            return;
+        }
+        case 7: {
+            pb = pCoeffs;
+            float32x4_t b[8];
+
+            for (int i = 0; i < nbTaps; i++)
+                b[i] = vld1q_f32(pb + i * 4);
+            if (nTail > 0)
+                b[7] = vld1q_f32(pb + nbTaps * 4);
+            ARM_START_OF_FUNCTION_COMMON_FIR_F32(pState);
+            ARM_INNER_LOOP_COEF_28_31_FIR_F32();
+            ARM_END_OF_FUNCTION_COMMON_FIR_F32();
+            return;
+        }
+        case 8: {
+            pb = pCoeffs;
+            float32x4_t b[9];
+
+            for (int i = 0; i < nbTaps; i++)
+                b[i] = vld1q_f32(pb + i * 4);
+            if (nTail > 0)
+                b[8] = vld1q_f32(pb + nbTaps * 4);
+
+            ARM_START_OF_FUNCTION_COMMON_FIR_F32(pState);
+            ARM_INNER_LOOP_COEF_32_35_FIR_F32();
+            ARM_END_OF_FUNCTION_COMMON_FIR_F32();
+            return;
+        }
+        default: {
+            //printf("default\n");
+            float32x4_t b[1];
+            ARM_START_OF_FUNCTION_COMMON_FIR_F32(pState);
+            ARM_INNER_LOOP_GENERIC_FIR_F32();
+            ARM_END_OF_FUNCTION_COMMON_FIR_F32();
+            return;
+        }
+        }
     }
 }
 
